@@ -1,0 +1,22 @@
+# ============================================
+# Configuração Local para Desenvolvimento
+# ============================================
+
+# Banco de Dados PostgreSQL
+# Substitua os valores conforme sua configuração local
+DATABASE_URL=postgresql://postgres:142136@localhost:5432/iab_fapegma
+
+# Segredo JWT para assinatura de cookies
+# Use uma string longa e aleatória em produção
+JWT_SECRET=iab_fapegma_portal_secret_key_2026_local_dev
+
+# Ambiente
+NODE_ENV=development
+PORT=3000
+
+# ID do Aplicativo
+VITE_APP_ID=iab-fapegma-portal
+
+# Configurações opcionais (deixe em branco se não usar OAuth)
+# OAUTH_SERVER_URL=
+# OWNER_OPEN_ID=
