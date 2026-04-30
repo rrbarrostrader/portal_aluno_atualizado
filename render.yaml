@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: iab-fapegma-portal
+    env: node
+    buildCommand: pnpm install --no-frozen-lockfile && pnpm run build
+    startCommand: pnpm run db:push && pnpm run start
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {
+          name: portal-do-aluno,
+          property: connectionString
+        }
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VITE_APP_ID
+        value: iab-fapegma-portal
+      - key: NODE_ENV
+        value: production
