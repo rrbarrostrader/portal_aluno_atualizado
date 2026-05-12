@@ -12,8 +12,8 @@ import StudentSecretaria from "./pages/StudentSecretaria";
 import StudentAcademic from "./pages/StudentAcademic";
 import StudentAnnouncements from "./pages/StudentAnnouncements";
 import StudentPayment from "./pages/StudentPayment";
+import StudentID from "./pages/StudentID";
 import AdminDashboard from "./pages/AdminDashboard";
-import TeacherGrades from "./pages/TeacherGrades";
 import { ChangePasswordRequired } from "./pages/ChangePasswordRequired";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -24,7 +24,7 @@ function ProtectedRoute({
   requiredRole,
 }: {
   component: React.ComponentType<any>;
-  requiredRole?: "admin" | "user" | "teacher";
+  requiredRole?: "admin" | "user";
 }) {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
@@ -92,6 +92,10 @@ function Router() {
         path={"/student/pagamento"}
         component={() => <ProtectedRoute component={StudentPayment} requiredRole="user" />}
       />
+      <Route
+        path={"/student/carteirinha"}
+        component={() => <ProtectedRoute component={StudentID} requiredRole="user" />}
+      />
       
       {/* Rotas do Admin */}
       <Route
@@ -101,12 +105,6 @@ function Router() {
       <Route
         path={"/admin/*"}
         component={() => <ProtectedRoute component={AdminDashboard} requiredRole="admin" />}
-      />
-
-      {/* Rotas do Professor */}
-      <Route
-        path={"/teacher"}
-        component={() => <ProtectedRoute component={TeacherGrades} requiredRole="teacher" />}
       />
       
       <Route path={"/404"} component={NotFound} />

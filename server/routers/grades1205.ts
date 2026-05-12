@@ -5,20 +5,9 @@ import { grades, enrollments, subjects } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-// Middleware para verificar se é professor ou admin
-const teacherProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  if (ctx.user?.role !== "teacher" && ctx.user?.role !== "admin") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Acesso restrito a professores e administradores",
-    });
-  }
-  return next({ ctx });
-});
-
 export const gradesRouter = router({
   // Registrar ou atualizar nota
-  recordGrade: teacherProcedure
+  recordGrade: protectedProcedure
     .input(
       z.object({
         enrollmentId: z.number(),

@@ -30,8 +30,6 @@ export default function Login() {
       // Redireciona baseado no papel do usuário
       if (data.role === "admin") {
         setLocation("/admin");
-      } else if (data.role === "teacher") {
-        setLocation("/teacher");
       } else {
         setLocation("/student");
       }
