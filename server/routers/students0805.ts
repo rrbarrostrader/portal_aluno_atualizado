@@ -12,14 +12,8 @@ import { sendWelcomeEmail } from "../email";
 const createStudentSchema = z.object({
   email: z.string().email(),
   name: z.string().min(3),
-  role: z.enum(["user", "admin", "teacher"]),
-  courseId: z.number().int().positive().optional(),
+  courseId: z.number().int().positive(),
   registrationNumber: z.string().optional(),
-  cpf: z.string().optional(),
-  rg: z.string().optional(),
-  birthDate: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
 });
 
 const updateStudentSchema = z.object({
@@ -27,12 +21,6 @@ const updateStudentSchema = z.object({
   name: z.string().min(3).optional(),
   email: z.string().email().optional(),
   status: z.enum(["active", "inactive", "suspended"]).optional(),
-  role: z.enum(["user", "admin", "teacher"]).optional(),
-  cpf: z.string().optional(),
-  rg: z.string().optional(),
-  birthDate: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
 });
 
 const deleteStudentSchema = z.object({
@@ -72,17 +60,10 @@ export const studentsRouter = router({
         id: users.id,
         email: users.email,
         name: users.name,
-        role: users.role,
         status: users.status,
-        cpf: users.cpf,
-        rg: users.rg,
-        birthDate: users.birthDate,
-        address: users.address,
-        phone: users.phone,
         firstLoginCompleted: users.firstLoginCompleted,
         createdAt: users.createdAt,
         registrationNumber: enrollments.registrationNumber,
-        enrollmentId: enrollments.id,
         courseId: enrollments.courseId,
         courseName: courses.name,
         courseType: courses.type,
@@ -90,6 +71,7 @@ export const studentsRouter = router({
       .from(users)
       .leftJoin(enrollments, eq(users.id, enrollments.userId))
       .leftJoin(courses, eq(enrollments.courseId, courses.id))
+      .where(eq(users.role, "user"))
       .orderBy(users.name);
 
     return students;
@@ -132,13 +114,9 @@ export const studentsRouter = router({
     .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Banco de dados indisponível",
-        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
       }
 
-      // Verifica se a matrícula pertence ao aluno
       const enrollment = await db
         .select()
         .from(enrollments)
@@ -146,69 +124,60 @@ export const studentsRouter = router({
         .limit(1);
 
       if (enrollment.length === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Acesso negado a esta matrícula",
-        });
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
-      // DEBUG: Log para verificar os parâmetros
-      console.log("[DEBUG getMyGrades] Input:", {
-        enrollmentId: input.enrollmentId,
-        semester: input.semester,
-        courseId: enrollment[0].courseId,
-      });
-
-      // Busca TODAS as disciplinas do semestre, com ou sem notas lançadas
-      // Primeiro, busca todas as disciplinas do curso e semestre
-      const allSubjects = await db
+      // Busca disciplinas e notas em uma única query (Left Join) para garantir que todas as disciplinas apareçam
+      const result = await db
         .select({
-          id: subjects.id,
-          name: subjects.name,
-          code: subjects.code,
+          subjectId: subjects.id,
+          subjectName: subjects.name,
+          subjectCode: subjects.code,
           courseHours: subjects.courseHours,
           semester: subjects.semester,
+          firstBimester: grades.firstBimester,
+          secondBimester: grades.secondBimester,
+          thirdBimester: grades.thirdBimester,
+          fourthBimester: grades.fourthBimester,
+          finalExam: grades.finalExam,
+          finalGrade: grades.finalGrade,
+          status: grades.status,
         })
         .from(subjects)
+        .leftJoin(grades, and(
+          eq(grades.subjectId, subjects.id),
+          eq(grades.enrollmentId, input.enrollmentId)
+        ))
         .where(and(
           eq(subjects.courseId, enrollment[0].courseId),
-          eq(subjects.semester, input.semester)
+          eq(subjects.semester, input.semester),
+          eq(subjects.status, "active")
         ))
-        .orderBy(subjects.id);
+        .orderBy(subjects.name);
 
-      console.log("[DEBUG getMyGrades] Disciplinas encontradas:", allSubjects.length, allSubjects);
+      return result.map(item => ({
+        ...item,
+        status: item.status || "pending"
+      }));
+    }),
 
-      // Depois, busca as notas para cada disciplina
-      const studentGrades = await Promise.all(
-        allSubjects.map(async (subject) => {
-          const gradeRecord = await db
-            .select()
-            .from(grades)
-            .where(and(
-              eq(grades.enrollmentId, input.enrollmentId),
-              eq(grades.subjectId, subject.id),
-              eq(grades.semester, input.semester)
-            ))
-            .limit(1);
+  /**
+   * Obter semestres que possuem disciplinas cadastradas para o curso (Aluno)
+   */
+  getCourseSemesters: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
 
-          return {
-            subjectId: subject.id,
-            subjectName: subject.name,
-            subjectCode: subject.code,
-            courseHours: subject.courseHours,
-            firstBimester: gradeRecord[0]?.firstBimester || null,
-            secondBimester: gradeRecord[0]?.secondBimester || null,
-            thirdBimester: gradeRecord[0]?.thirdBimester || null,
-            fourthBimester: gradeRecord[0]?.fourthBimester || null,
-            finalExam: gradeRecord[0]?.finalExam || null,
-            finalGrade: gradeRecord[0]?.finalGrade || null,
-            status: gradeRecord[0]?.status || "pending",
-          };
-        })
-      );
+      const result = await db
+        .select({ semester: subjects.semester })
+        .from(subjects)
+        .where(and(eq(subjects.courseId, input.courseId), eq(subjects.status, "active")))
+        .groupBy(subjects.semester)
+        .orderBy(subjects.semester);
 
-      console.log("[DEBUG getMyGrades] Resultado final:", studentGrades.length, studentGrades);
-      return studentGrades;
+      return result.map(r => r.semester).filter((s): s is number => s !== null);
     }),
 
   /**
@@ -347,19 +316,14 @@ export const studentsRouter = router({
 
       // Insere o novo usuário
       const result = await db.insert(users).values({
-        openId: `${input.role}-${Date.now()}-${Math.random()}`,
+        openId: `student-${Date.now()}-${Math.random()}`,
         email: input.email,
         name: input.name,
         passwordHash,
-        role: input.role,
+        role: "user",
         status: "active",
-        firstLoginCompleted: false,
+        firstLoginCompleted: false, // Marca como primeiro acesso pendente
         loginMethod: "email",
-        cpf: input.cpf,
-        rg: input.rg,
-        birthDate: input.birthDate,
-        address: input.address,
-        phone: input.phone,
       }).returning({ insertedId: users.id });
 
       const userId = result[0].insertedId;
@@ -367,17 +331,15 @@ export const studentsRouter = router({
       // Formatar data atual para YYYY-MM-DD (compatível com PostgreSQL DATE)
       const today = new Date().toISOString().split('T')[0];
 
-      // Cria a matrícula apenas se houver courseId (para alunos)
-      if (input.courseId) {
-        await db.insert(enrollments).values({
-          userId: userId,
-          courseId: input.courseId,
-          enrollmentDate: today,
-          status: "active",
-          currentSemester: 1,
-          registrationNumber: input.registrationNumber,
-        });
-      }
+      // Cria a matrícula
+      await db.insert(enrollments).values({
+        userId: userId,
+        courseId: input.courseId,
+        enrollmentDate: today,
+        status: "active",
+        currentSemester: 1,
+        registrationNumber: input.registrationNumber,
+      });
 
       // Envia o e-mail com a senha temporária
       const emailSent = await sendWelcomeEmail(
@@ -422,12 +384,6 @@ export const studentsRouter = router({
       if (input.name) updateData.name = input.name;
       if (input.email) updateData.email = input.email;
       if (input.status) updateData.status = input.status;
-      if (input.role) updateData.role = input.role;
-      if (input.cpf) updateData.cpf = input.cpf;
-      if (input.rg) updateData.rg = input.rg;
-      if (input.birthDate) updateData.birthDate = input.birthDate;
-      if (input.address) updateData.address = input.address;
-      if (input.phone) updateData.phone = input.phone;
 
       if (Object.keys(updateData).length === 0) {
         throw new TRPCError({

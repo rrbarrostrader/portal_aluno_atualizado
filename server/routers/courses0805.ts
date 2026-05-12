@@ -10,8 +10,9 @@ const createCourseSchema = z.object({
   name: z.string().min(3),
   code: z.string().min(2),
   description: z.string().optional(),
-  type: z.enum(["graduation", "postgraduate", "technical"]),
+  type: z.enum(["graduation", "postgraduate", "extension", "technical"]),
   duration: z.number().int().positive().optional(),
+  semesters: z.number().int().positive().optional(),
 });
 
 const createSubjectSchema = z.object({
@@ -21,6 +22,7 @@ const createSubjectSchema = z.object({
   description: z.string().optional(),
   credits: z.number().int().positive().optional(),
   workload: z.number().int().positive().optional(),
+  courseHours: z.number().int().positive().optional(),
   semester: z.number().int().positive().optional(),
 });
 
@@ -29,6 +31,7 @@ const updateCourseSchema = z.object({
   name: z.string().min(3).optional(),
   description: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
+  semesters: z.number().int().positive().optional(),
 });
 
 const deleteCourseSchema = z.object({
@@ -134,6 +137,7 @@ export const coursesRouter = router({
         description: input.description,
         type: input.type,
         duration: input.duration,
+        semesters: input.semesters || 8,
         status: "active",
       });
 
@@ -206,6 +210,7 @@ export const coursesRouter = router({
         description: input.description,
         credits: input.credits,
         workload: input.workload,
+        courseHours: input.courseHours || input.workload,
         semester: input.semester,
         status: "active",
       });
@@ -243,6 +248,7 @@ export const coursesRouter = router({
       if (input.name) updateData.name = input.name;
       if (input.description) updateData.description = input.description;
       if (input.status) updateData.status = input.status;
+      if (input.semesters) updateData.semesters = input.semesters;
 
       if (Object.keys(updateData).length === 0) {
         throw new TRPCError({
@@ -338,7 +344,6 @@ export const coursesRouter = router({
           email: users.email,
           enrollmentId: enrollments.id,
           currentSemester: enrollments.currentSemester,
-          registrationNumber: enrollments.registrationNumber,
         })
         .from(users)
         .innerJoin(enrollments, eq(users.id, enrollments.userId))
@@ -348,7 +353,7 @@ export const coursesRouter = router({
     }),
 
   /**
-   * Inicializar com todos os 18 cursos padrão (Corrigido acentuação)
+   * Inicializar com todos os 18 cursos padrão
    */
   seedDefaultCourses: adminProcedure.mutation(async () => {
     const db = await getDb();
@@ -361,27 +366,24 @@ export const coursesRouter = router({
 
     try {
       const defaultCourses = [
-        // Graduação
-        { name: "Administração", code: "ADM-001", type: "graduation" as const, description: "Curso de Administração" },
-        { name: "Pedagogia", code: "PED-001", type: "graduation" as const, description: "Curso de Pedagogia" },
-        { name: "História", code: "HIS-001", type: "graduation" as const, description: "Curso de História" },
-        { name: "Matemática", code: "MAT-001", type: "graduation" as const, description: "Curso de Matemática" },
-        { name: "Geografia", code: "GEO-001", type: "graduation" as const, description: "Curso de Geografia" },
-        { name: "Língua Portuguesa", code: "LPO-001", type: "graduation" as const, description: "Curso de Língua Portuguesa" },
-        { name: "Inglês", code: "ING-001", type: "graduation" as const, description: "Curso de Inglês" },
-        { name: "Espanhol", code: "ESP-001", type: "graduation" as const, description: "Curso de Espanhol" },
-        // Pós-graduação
-        { name: "Educação Física", code: "EDF-001", type: "postgraduate" as const, description: "Pós-graduação em Educação Física" },
-        { name: "Psicopedagogia", code: "PSI-001", type: "postgraduate" as const, description: "Pós-graduação em Psicopedagogia" },
-        { name: "ABA", code: "ABA-001", type: "postgraduate" as const, description: "Pós-graduação em ABA" },
-        { name: "AEE", code: "AEE-001", type: "postgraduate" as const, description: "Pós-graduação em AEE" },
-        { name: "Educação Infantil", code: "EDI-001", type: "postgraduate" as const, description: "Pós-graduação em Educação Infantil" },
-        { name: "Gestão Escolar", code: "GES-001", type: "postgraduate" as const, description: "Pós-graduação em Gestão Escolar" },
-        { name: "Nutrição Esportiva", code: "NUT-001", type: "postgraduate" as const, description: "Pós-graduação em Nutrição Esportiva" },
-        // Técnicos
-        { name: "Enfermagem (Técnico)", code: "ENF-001", type: "technical" as const, description: "Curso Técnico em Enfermagem" },
-        { name: "Técnico em Estética", code: "EST-001", type: "technical" as const, description: "Curso Técnico em Estética" },
-        { name: "Teologia", code: "TEO-001", type: "technical" as const, description: "Curso de Teologia" },
+        { name: "Administração", code: "ADM-001", type: "graduation" as const, description: "Curso de Administração", semesters: 8 },
+        { name: "Pedagogia", code: "PED-001", type: "graduation" as const, description: "Curso de Pedagogia", semesters: 8 },
+        { name: "História", code: "HIS-001", type: "graduation" as const, description: "Curso de História", semesters: 8 },
+        { name: "Matemática", code: "MAT-001", type: "graduation" as const, description: "Curso de Matemática", semesters: 8 },
+        { name: "Geografia", code: "GEO-001", type: "graduation" as const, description: "Curso de Geografia", semesters: 8 },
+        { name: "Língua Portuguesa", code: "LPO-001", type: "graduation" as const, description: "Curso de Língua Portuguesa", semesters: 8 },
+        { name: "Inglês", code: "ING-001", type: "graduation" as const, description: "Curso de Inglês", semesters: 8 },
+        { name: "Espanhol", code: "ESP-001", type: "graduation" as const, description: "Curso de Espanhol", semesters: 8 },
+        { name: "Educação Física", code: "EDF-001", type: "postgraduate" as const, description: "Pós-graduação em Educação Física", semesters: 2 },
+        { name: "Psicopedagogia", code: "PSI-001", type: "postgraduate" as const, description: "Pós-graduação em Psicopedagogia", semesters: 2 },
+        { name: "ABA", code: "ABA-001", type: "postgraduate" as const, description: "Pós-graduação em ABA", semesters: 2 },
+        { name: "AEE", code: "AEE-001", type: "postgraduate" as const, description: "Pós-graduação em AEE", semesters: 2 },
+        { name: "Educação Infantil", code: "EDI-001", type: "postgraduate" as const, description: "Pós-graduação em Educação Infantil", semesters: 2 },
+        { name: "Gestão Escolar", code: "GES-001", type: "postgraduate" as const, description: "Pós-graduação em Gestão Escolar", semesters: 2 },
+        { name: "Nutrição Esportiva", code: "NUT-001", type: "postgraduate" as const, description: "Pós-graduação em Nutrição Esportiva", semesters: 2 },
+        { name: "Enfermagem (Técnico)", code: "ENF-001", type: "technical" as const, description: "Curso Técnico em Enfermagem", semesters: 4 },
+        { name: "Técnico em Estética", code: "EST-001", type: "technical" as const, description: "Curso Técnico em Estética", semesters: 4 },
+        { name: "Teologia", code: "TEO-001", type: "technical" as const, description: "Curso de Teologia", semesters: 8 },
       ];
 
       let createdCount = 0;
@@ -401,17 +403,14 @@ export const coursesRouter = router({
           });
           createdCount++;
         } else {
-          // Se já existe, atualiza o nome para garantir acentuação correta
-          await db.update(courses).set({ name: courseData.name }).where(eq(courses.code, courseData.code));
+          await db.update(courses).set({ name: courseData.name, semesters: courseData.semesters }).where(eq(courses.code, courseData.code));
           skippedCount++;
         }
       }
 
       return {
         success: true,
-        message: `Cursos carregados: ${createdCount} criados, ${skippedCount} atualizados/existiam`,
-        created: createdCount,
-        skipped: skippedCount,
+        message: `Cursos carregados: ${createdCount} criados, ${skippedCount} atualizados`,
       };
     } catch (error) {
       throw new TRPCError({

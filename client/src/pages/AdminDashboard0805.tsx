@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { LogOut, Users, BookOpen, BarChart3, Settings, GraduationCap, School, Loader2, Bell, DollarSign } from "lucide-react";
+import { LogOut, Users, BookOpen, BarChart3, Settings, GraduationCap, School, Loader2, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import AdminStudents from "./AdminStudents";
@@ -11,7 +11,6 @@ import AdminGrades from "./AdminGrades";
 import AdminCourses from "./AdminCourses";
 import AdminSettings from "./AdminSettings";
 import AdminAnnouncements from "./AdminAnnouncements";
-import AdminPayments from "./AdminPayments";
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -88,7 +87,17 @@ export default function AdminDashboard() {
               <BarChart3 className="w-4 h-4" />
               Visão Geral
             </button>
-
+            <button
+              onClick={() => setActiveTab("students")}
+              className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                activeTab === "students"
+                  ? "bg-yellow-100 text-yellow-900 font-medium"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Alunos
+            </button>
             <button
               onClick={() => setActiveTab("grades")}
               className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
@@ -121,17 +130,6 @@ export default function AdminDashboard() {
             >
               <Bell className="w-4 h-4" />
               Avisos
-            </button>
-            <button
-              onClick={() => setActiveTab("finance")}
-              className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                activeTab === "finance"
-                  ? "bg-yellow-100 text-yellow-900 font-medium"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              <DollarSign className="w-4 h-4" />
-              Financeiro
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -264,15 +262,13 @@ export default function AdminDashboard() {
             </div>
           )}
 
-
+          {activeTab === "students" && <AdminStudents />}
 
           {activeTab === "grades" && <AdminGrades />}
 
           {activeTab === "courses" && <AdminCourses />}
 
           {activeTab === "announcements" && <AdminAnnouncements />}
-
-          {activeTab === "finance" && <AdminPayments />}
 
           {activeTab === "settings" && <AdminSettings />}
         </main>

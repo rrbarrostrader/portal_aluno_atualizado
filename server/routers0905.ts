@@ -9,7 +9,6 @@ import { gradesRouter } from "./routers/grades";
 import { documentsRouter } from "./routers/documents";
 import { dashboardRouter } from "./routers/dashboard";
 import { announcementsRouter } from "./routers/announcements";
-import { paymentsRouter } from "./routers/payments";
 
 export const appRouter = router({
   system: systemRouter,
@@ -20,7 +19,6 @@ export const appRouter = router({
   documents: documentsRouter,
   dashboard: dashboardRouter,
   announcements: announcementsRouter,
-  payments: paymentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

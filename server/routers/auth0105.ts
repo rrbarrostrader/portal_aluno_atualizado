@@ -50,7 +50,6 @@ export const authRouter = router({
           role: user.role,
           status: user.status,
           firstLoginCompleted: user.firstLoginCompleted,
-          profileImageUrl: user.profileImageUrl,
         }
       : null;
   }),
@@ -253,72 +252,6 @@ export const authRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Erro ao alterar senha",
-        });
-      }
-    }),
-
-  /**
-   * Atualizar foto de perfil do usuário (Salvamento Local)
-   */
-  updateProfileImage: protectedProcedure
-    .input(z.object({ 
-      base64Image: z.string(),
-      contentType: z.string().default("image/jpeg")
-    }))
-    .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
-      }
-
-      console.log(`[Upload] Iniciando upload para usuário ${ctx.user.id}`);
-
-      try {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
-
-        const fs = await import("fs/promises");
-        const path = await import("path");
-        
-        // Remove o prefixo data:image/...;base64, se existir
-        const base64Data = input.base64Image.includes("base64,") 
-          ? input.base64Image.split("base64,")[1] 
-          : input.base64Image;
-          
-        const buffer = Buffer.from(base64Data, "base64");
-        
-        // Define o diretório de upload (pasta public para ser acessível pelo frontend)
-        const uploadDir = path.join(process.cwd(), "public", "uploads", "profiles");
-        
-        // Garante que a pasta existe
-        try {
-          await fs.mkdir(uploadDir, { recursive: true });
-        } catch (e) {
-          console.error("[Upload] Erro ao criar diretório:", e);
-        }
-        
-        const fileName = `user-${ctx.user.id}-${Date.now()}.jpg`;
-        const filePath = path.join(uploadDir, fileName);
-        
-        // Salva o arquivo fisicamente
-        await fs.writeFile(filePath, buffer);
-        console.log(`[Upload] Arquivo salvo em: ${filePath}`);
-        
-        // URL pública para o frontend
-        const publicUrl = `/uploads/profiles/${fileName}`;
-
-        // Atualiza o usuário no banco
-        await db.update(users)
-          .set({ profileImageUrl: publicUrl })
-          .where(eq(users.id, ctx.user.id));
-
-        console.log(`[Upload] Banco de dados atualizado com URL: ${publicUrl}`);
-
-        return { success: true, imageUrl: publicUrl };
-      } catch (error) {
-        console.error("[Upload] Erro fatal:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `Falha no upload: ${error instanceof Error ? error.message : "Erro desconhecido"}`
         });
       }
     }),

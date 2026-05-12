@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit2, Trash2, Loader2, BookOpen, ChevronRight, ChevronDown, Save, X, Hash } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, BookOpen, ChevronRight, ChevronDown, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -18,8 +18,8 @@ export default function AdminCourses() {
     code: "",
     description: "",
     type: "graduation" as const,
-    duration: 3000,
-    semesters: 8,
+    duration: 48,
+    semesters: 4,
   });
 
   const [editCourse, setEditCourse] = useState({
@@ -27,12 +27,12 @@ export default function AdminCourses() {
     name: "",
     description: "",
     status: "active" as const,
-    semesters: 8,
+    semesters: 4,
   });
 
   const [newSubject, setNewSubject] = useState({
     name: "",
-    code: "AUTO", // Código automático por padrão
+    code: "",
     description: "",
     credits: 4,
     workload: 60,
@@ -43,6 +43,16 @@ export default function AdminCourses() {
   // Queries
   const coursesQuery = trpc.courses.list.useQuery();
   
+  const seedMutation = trpc.courses.seedDefaultCourses.useMutation({
+    onSuccess: () => {
+      toast.success("Cursos padrão carregados com sucesso!");
+      coursesQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao carregar cursos padrão");
+    },
+  });
+
   const createMutation = trpc.courses.create.useMutation({
     onSuccess: () => {
       toast.success("Curso criado com sucesso!");
@@ -51,8 +61,8 @@ export default function AdminCourses() {
         code: "",
         description: "",
         type: "graduation",
-        duration: 3000,
-        semesters: 8,
+        duration: 48,
+        semesters: 4,
       });
       setIsAddingCourse(false);
       coursesQuery.refetch();
@@ -88,7 +98,7 @@ export default function AdminCourses() {
       toast.success("Disciplina cadastrada com sucesso!");
       setNewSubject({
         name: "",
-        code: "AUTO",
+        code: "",
         description: "",
         credits: 4,
         workload: 60,
@@ -96,6 +106,7 @@ export default function AdminCourses() {
         semester: 1,
       });
       setIsAddingSubject(null);
+      // Atualizar a lista de disciplinas do curso
       if (expandedCourse) {
         fetchSubjects(expandedCourse);
       }
@@ -138,7 +149,7 @@ export default function AdminCourses() {
       name: course.name,
       description: course.description || "",
       status: course.status || "active",
-      semesters: course.semesters || 8,
+      semesters: course.semesters || 4,
     });
   };
 
@@ -157,22 +168,12 @@ export default function AdminCourses() {
   };
 
   const handleAddSubject = (courseId: number) => {
-    if (!newSubject.name) {
-      toast.error("Preencha o nome da disciplina");
+    if (!newSubject.name || !newSubject.code) {
+      toast.error("Preencha o nome e código da disciplina");
       return;
     }
-    
-    // Se o código for AUTO, geramos um baseado no nome ou timestamp
-    let finalCode = newSubject.code;
-    if (finalCode === "AUTO" || !finalCode) {
-      const prefix = newSubject.name.substring(0, 3).toUpperCase();
-      const random = Math.floor(100 + Math.random() * 900);
-      finalCode = `${prefix}-${random}`;
-    }
-
     createSubjectMutation.mutate({
       ...newSubject,
-      code: finalCode,
       courseId,
     });
   };
@@ -180,6 +181,12 @@ export default function AdminCourses() {
   const handleDeleteCourse = (id: number) => {
     if (confirm("Tem certeza que deseja deletar este curso?")) {
       deleteMutation.mutate({ id });
+    }
+  };
+
+  const handleSeedCourses = () => {
+    if (confirm("Isso carregará os 18 cursos padrão. Continuar?")) {
+      seedMutation.mutate();
     }
   };
 
@@ -195,14 +202,6 @@ export default function AdminCourses() {
   const courses = coursesQuery.data || [];
   const subjects = courseSubjects[expandedCourse || 0] || subjectsQuery.data || [];
   
-  // Organizar disciplinas por semestre
-  const subjectsBySemester: Record<number, any[]> = {};
-  subjects.forEach(s => {
-    const sem = s.semester || 1;
-    if (!subjectsBySemester[sem]) subjectsBySemester[sem] = [];
-    subjectsBySemester[sem].push(s);
-  });
-
   const renderCourseList = (type: string, title: string) => {
     const filteredCourses = courses.filter(c => c.type === type);
     if (filteredCourses.length === 0) return null;
@@ -224,15 +223,15 @@ export default function AdminCourses() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredCourses.map((course) => (
-                <React.Fragment key={course.id}>
-                  <tr className="hover:bg-slate-50 transition-colors">
+                <>
+                  <tr key={course.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <Checkbox id={`course-${course.id}`} />
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{course.code}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{course.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{course.duration}h</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{course.semesters || 8}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{course.semesters || 4}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <Button 
@@ -267,9 +266,9 @@ export default function AdminCourses() {
                   {expandedCourse === course.id && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={6} className="px-12 py-6">
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Gerenciamento de Disciplinas</h4>
+                            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Disciplinas do Curso</h4>
                             <Button 
                               size="sm" 
                               className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 text-xs font-bold"
@@ -293,16 +292,13 @@ export default function AdminCourses() {
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Código (Deixe AUTO para automático)</label>
-                                    <div className="relative">
-                                      <input 
-                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md pr-10"
-                                        placeholder="Ex: PORT-001"
-                                        value={newSubject.code}
-                                        onChange={(e) => setNewSubject({...newSubject, code: e.target.value})}
-                                      />
-                                      <Hash className="w-4 h-4 absolute right-3 top-2.5 text-slate-400" />
-                                    </div>
+                                    <label className="text-xs font-bold text-slate-700">Código</label>
+                                    <input 
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md"
+                                      placeholder="Ex: PORT-001"
+                                      value={newSubject.code}
+                                      onChange={(e) => setNewSubject({...newSubject, code: e.target.value})}
+                                    />
                                   </div>
                                   <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-700">Semestre</label>
@@ -311,19 +307,19 @@ export default function AdminCourses() {
                                       value={newSubject.semester}
                                       onChange={(e) => setNewSubject({...newSubject, semester: parseInt(e.target.value)})}
                                     >
-                                      {Array.from({length: course.semesters || 8}, (_, i) => i + 1).map(sem => (
+                                      {Array.from({length: course.semesters || 4}, (_, i) => i + 1).map(sem => (
                                         <option key={sem} value={sem}>{sem}º Semestre</option>
                                       ))}
                                     </select>
                                   </div>
                                   <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Carga Horária (H)</label>
+                                    <label className="text-xs font-bold text-slate-700">Carga Horária</label>
                                     <input 
                                       type="number"
                                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md"
                                       placeholder="Ex: 60"
                                       value={newSubject.courseHours}
-                                      onChange={(e) => setNewSubject({...newSubject, courseHours: parseInt(e.target.value), workload: parseInt(e.target.value)})}
+                                      onChange={(e) => setNewSubject({...newSubject, courseHours: parseInt(e.target.value)})}
                                     />
                                   </div>
                                 </div>
@@ -347,56 +343,39 @@ export default function AdminCourses() {
                             </Card>
                           )}
 
-                          {/* Listagem Organizada por Semestre */}
-                          <div className="space-y-6">
-                            {Array.from({length: course.semesters || 8}, (_, i) => i + 1).map(sem => {
-                              const semSubjects = subjectsBySemester[sem] || [];
-                              if (semSubjects.length === 0 && !isAddingSubject) return null;
-                              if (semSubjects.length === 0) return null;
-
-                              return (
-                                <div key={sem} className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-px flex-1 bg-slate-200"></div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{sem}º Semestre</span>
-                                    <div className="h-px flex-1 bg-slate-200"></div>
-                                  </div>
-                                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                    <table className="w-full text-left text-sm">
-                                      <thead>
-                                        <tr className="bg-slate-50/50 border-b border-slate-200">
-                                          <th className="px-4 py-2 font-bold text-slate-600 w-32">Código</th>
-                                          <th className="px-4 py-2 font-bold text-slate-600">Nome da Disciplina</th>
-                                          <th className="px-4 py-2 font-bold text-slate-600 text-center w-24">C.H</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {semSubjects.map((subject) => (
-                                          <tr key={subject.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-4 py-2 text-slate-900 font-mono text-xs">{subject.code}</td>
-                                            <td className="px-4 py-2 text-slate-700 font-medium">{subject.name}</td>
-                                            <td className="px-4 py-2 text-slate-600 text-center">{subject.courseHours || subject.workload}h</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            
-                            {subjects.length === 0 && (
-                              <div className="text-center py-12 bg-white border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
-                                <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                <p>Nenhuma disciplina cadastrada neste curso.</p>
-                              </div>
-                            )}
-                          </div>
+                          {subjects && subjects.length > 0 ? (
+                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                              <table className="w-full text-left text-sm">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-200">
+                                    <th className="px-4 py-2 font-semibold text-slate-700">Código</th>
+                                    <th className="px-4 py-2 font-semibold text-slate-700">Nome</th>
+                                    <th className="px-4 py-2 font-semibold text-slate-700">Semestre</th>
+                                    <th className="px-4 py-2 font-semibold text-slate-700">C.H</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                  {subjects.map((subject) => (
+                                    <tr key={subject.id} className="hover:bg-slate-50">
+                                      <td className="px-4 py-2 text-slate-900 font-medium">{subject.code}</td>
+                                      <td className="px-4 py-2 text-slate-600">{subject.name}</td>
+                                      <td className="px-4 py-2 text-slate-600">{subject.semester}º</td>
+                                      <td className="px-4 py-2 text-slate-600">{subject.courseHours || subject.workload}h</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-slate-500">
+                              <p>Nenhuma disciplina cadastrada. Clique em "Adicionar Disciplina" para começar.</p>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
                   )}
-                </React.Fragment>
+                </>
               ))}
             </tbody>
           </table>
@@ -414,16 +393,23 @@ export default function AdminCourses() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 py-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Gerenciar Cursos</h1>
-          <p className="text-slate-600 mt-1">Configure a grade curricular e os semestres dos cursos</p>
+          <p className="text-slate-600 mt-1">Visualize e gerencie os cursos e suas disciplinas</p>
         </div>
         <div className="flex gap-2">
           <Button 
+            onClick={handleSeedCourses}
+            variant="outline"
+            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+          >
+            Carregar Cursos Padrão
+          </Button>
+          <Button 
             onClick={() => setIsAddingCourse(!isAddingCourse)}
-            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold shadow-sm"
+            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold"
           >
             <Plus className="w-4 h-4 mr-2" /> Novo Curso
           </Button>
@@ -431,10 +417,9 @@ export default function AdminCourses() {
       </div>
 
       {isAddingCourse && (
-        <Card className="border-yellow-200 bg-yellow-50/30 shadow-md">
+        <Card className="border-yellow-200 bg-yellow-50/30">
           <CardHeader>
             <CardTitle>Criar Novo Curso</CardTitle>
-            <CardDescription>Preencha as informações básicas para criar um novo curso no sistema</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAddCourse} className="space-y-4">
@@ -442,7 +427,7 @@ export default function AdminCourses() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Nome do Curso</label>
                   <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     placeholder="Ex: Administração"
                     value={newCourse.name}
                     onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
@@ -451,17 +436,17 @@ export default function AdminCourses() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Código</label>
                   <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     placeholder="Ex: ADM-001"
                     value={newCourse.code}
                     onChange={(e) => setNewCourse({...newCourse, code: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Duração Total (horas)</label>
+                  <label className="text-sm font-semibold text-slate-700">Duração (horas)</label>
                   <input 
                     type="number"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     value={newCourse.duration}
                     onChange={(e) => setNewCourse({...newCourse, duration: parseInt(e.target.value)})}
                   />
@@ -471,19 +456,19 @@ export default function AdminCourses() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Quantidade de Semestres</label>
                   <select 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     value={newCourse.semesters}
                     onChange={(e) => setNewCourse({...newCourse, semesters: parseInt(e.target.value)})}
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(num => (
+                    {[2, 3, 4, 5, 6, 8].map(num => (
                       <option key={num} value={num}>{num} Semestres</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Tipo de Curso</label>
+                  <label className="text-sm font-semibold text-slate-700">Tipo</label>
                   <select 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     value={newCourse.type}
                     onChange={(e) => setNewCourse({...newCourse, type: e.target.value as any})}
                   >
@@ -493,9 +478,28 @@ export default function AdminCourses() {
                   </select>
                 </div>
               </div>
-              <div className="flex gap-2 justify-end pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsAddingCourse(false)}>Cancelar</Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Descrição</label>
+                <textarea 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md"
+                  placeholder="Descrição do curso"
+                  value={newCourse.description}
+                  onChange={(e) => setNewCourse({...newCourse, description: e.target.value})}
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddingCourse(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  className="bg-green-600 hover:bg-green-700"
+                >
                   <Save className="w-4 h-4 mr-2" /> Criar Curso
                 </Button>
               </div>
@@ -505,7 +509,7 @@ export default function AdminCourses() {
       )}
 
       {editingCourse && (
-        <Card className="border-blue-200 bg-blue-50/30 shadow-md">
+        <Card className="border-blue-200 bg-blue-50/30">
           <CardHeader>
             <CardTitle>Editar Curso</CardTitle>
           </CardHeader>
@@ -521,21 +525,38 @@ export default function AdminCourses() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Semestres</label>
+                  <label className="text-sm font-semibold text-slate-700">Quantidade de Semestres</label>
                   <select 
                     className="w-full px-3 py-2 border border-slate-300 rounded-md"
                     value={editCourse.semesters}
                     onChange={(e) => setEditCourse({...editCourse, semesters: parseInt(e.target.value)})}
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(num => (
+                    {[2, 3, 4, 5, 6, 8].map(num => (
                       <option key={num} value={num}>{num} Semestres</option>
                     ))}
                   </select>
                 </div>
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Descrição</label>
+                <textarea 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md"
+                  value={editCourse.description}
+                  onChange={(e) => setEditCourse({...editCourse, description: e.target.value})}
+                  rows={3}
+                />
+              </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancelar</Button>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSaveCourse}>
+                <Button 
+                  variant="outline"
+                  onClick={() => setEditingCourse(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSaveCourse}
+                >
                   <Save className="w-4 h-4 mr-2" /> Salvar Alterações
                 </Button>
               </div>
@@ -544,11 +565,9 @@ export default function AdminCourses() {
         </Card>
       )}
 
-      <div className="space-y-8">
-        {renderCourseList("graduation", "Graduação")}
-        {renderCourseList("postgraduate", "Pós-Graduação")}
-        {renderCourseList("extension", "Extensão")}
-      </div>
+      {renderCourseList("graduation", "Graduação")}
+      {renderCourseList("postgraduate", "Pós-Graduação")}
+      {renderCourseList("extension", "Extensão")}
     </div>
   );
 }

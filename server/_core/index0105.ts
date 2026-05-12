@@ -31,20 +31,6 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  
-  // Enable CORS for all requests
-  const cors = await import("cors");
-  app.use(cors.default());
-
-  // Serve static files from public directory (for profile photos)
-  const path = await import("path");
-  app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads"), {
-    setHeaders: (res) => {
-      res.set("Access-Control-Allow-Origin", "*");
-    }
-  }));
-  app.use(express.static(path.join(process.cwd(), "public")));
-
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

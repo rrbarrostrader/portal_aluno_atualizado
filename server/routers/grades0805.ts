@@ -208,19 +208,24 @@ export const gradesRouter = router({
           });
         }
 
-        // Se o semestre não for fornecido, buscamos todos para esta matrícula
-        const conditions = [eq(grades.enrollmentId, input.enrollmentId)];
-        
-        if (input.semester) {
-          conditions.push(eq(grades.semester, input.semester));
-        }
-
-        const result = await db
+        let query = db
           .select()
           .from(grades)
-          .where(and(...conditions));
+          .where(eq(grades.enrollmentId, input.enrollmentId));
 
-        return result;
+        if (input.semester) {
+          query = db
+            .select()
+            .from(grades)
+            .where(
+              and(
+                eq(grades.enrollmentId, input.enrollmentId),
+                eq(grades.semester, input.semester)
+              )
+            );
+        }
+
+        return await query;
       } catch (error: any) {
         console.error("Erro ao buscar notas do aluno:", error);
         throw new TRPCError({

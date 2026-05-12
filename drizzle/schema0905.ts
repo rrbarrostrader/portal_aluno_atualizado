@@ -26,8 +26,6 @@ export const attendanceStatusEnum = pgEnum("attendance_status", ["good", "warnin
 export const announcementTypeEnum = pgEnum("announcement_type", ["general", "academic", "financial", "administrative"]);
 export const announcementTargetEnum = pgEnum("announcement_target", ["all", "students", "admins"]);
 export const announcementPriorityEnum = pgEnum("announcement_priority", ["low", "medium", "high"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "overdue", "cancelled", "refunded"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["pix", "credit_card", "bank_slip", "cash"]);
 
 // ============================================
 // TABELAS - Usam os enums definidos acima
@@ -239,45 +237,3 @@ export const auditLogs = pgTable("auditLogs", {
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
-
-/**
- * Tabela de pagamentos e mensalidades
- */
-export const payments = pgTable("payments", {
-  id: serial("id").primaryKey(),
-  userId: integer("userid").notNull(),
-  enrollmentId: integer("enrollmentid"),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  interestAmount: decimal("interestamount", { precision: 10, scale: 2 }).default("0.00"), // Juros acumulados
-  penaltyAmount: decimal("penaltyamount", { precision: 10, scale: 2 }).default("0.00"),  // Multa fixa
-  totalAmount: decimal("totalamount", { precision: 10, scale: 2 }).notNull(),            // Valor original + juros + multa
-  dueDate: date("duedate").notNull(),
-  status: paymentStatusEnum("status").default("pending").notNull(),
-  paymentMethod: paymentMethodEnum("payment_method"),
-  paymentDate: timestamp("paymentdate"),
-  transactionId: varchar("transactionid", { length: 255 }),
-  pixCode: text("pixcode"),
-  barcode: text("barcode"),
-  receiptUrl: text("receipturl"),
-  createdAt: timestamp("createdat").defaultNow().notNull(),
-  updatedAt: timestamp("updatedat").defaultNow().notNull(),
-});
-
-export type Payment = typeof payments.$inferSelect;
-export type InsertPayment = typeof payments.$inferInsert;
-
-/**
- * Tabela de configurações financeiras (Juros, Multas, etc)
- */
-export const financialSettings = pgTable("financialSettings", {
-  id: serial("id").primaryKey(),
-  dailyInterestRate: decimal("dailyinterestrate", { precision: 5, scale: 2 }).default("0.00").notNull(), // Porcentagem de juros diários
-  fixedPenaltyRate: decimal("fixedpenaltyrate", { precision: 5, scale: 2 }).default("0.00").notNull(),  // Porcentagem de multa fixa por atraso
-  gracePeriodDays: integer("graceperioddays").default(0).notNull(),                                      // Dias de carência
-  updatedAt: timestamp("updatedat").defaultNow().notNull(),
-});
-
-export type FinancialSetting = typeof financialSettings.$inferSelect;
-export type InsertFinancialSetting = typeof financialSettings.$inferInsert;

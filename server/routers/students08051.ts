@@ -82,7 +82,6 @@ export const studentsRouter = router({
         firstLoginCompleted: users.firstLoginCompleted,
         createdAt: users.createdAt,
         registrationNumber: enrollments.registrationNumber,
-        enrollmentId: enrollments.id,
         courseId: enrollments.courseId,
         courseName: courses.name,
         courseType: courses.type,

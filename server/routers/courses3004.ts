@@ -338,7 +338,6 @@ export const coursesRouter = router({
           email: users.email,
           enrollmentId: enrollments.id,
           currentSemester: enrollments.currentSemester,
-          registrationNumber: enrollments.registrationNumber,
         })
         .from(users)
         .innerJoin(enrollments, eq(users.id, enrollments.userId))

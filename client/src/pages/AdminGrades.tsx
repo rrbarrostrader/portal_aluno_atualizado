@@ -4,13 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Save, Loader2, Search, UserCheck, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { BarChart3, Save, Loader2, Search, UserCheck, ChevronDown, ChevronUp, AlertCircle, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminGrades() {
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
-  const [selectedSemester, setSelectedSemester] = useState<string>("1");
   const [localGrades, setLocalGrades] = useState<Record<number, any>>({});
   const [expandedStudent, setExpandedStudent] = useState<number | null>(null);
   const [existingGrades, setExistingGrades] = useState<Record<number, any>>({});
@@ -27,11 +26,15 @@ export default function AdminGrades() {
     { enabled: !!selectedCourse }
   );
 
-  // Query para buscar notas existentes - REFETCH quando disciplina ou semestre mudam
+  // Encontrar a disciplina selecionada para saber o semestre dela
+  const currentSubject = subjectsQuery.data?.find(s => s.id.toString() === selectedSubject);
+  const selectedSemester = currentSubject?.semester || 1;
+
+  // Query para buscar notas existentes
   const existingGradesQuery = trpc.grades.getGradesBySubjectAndSemester.useQuery(
     { 
       subjectId: parseInt(selectedSubject) || 0,
-      semester: parseInt(selectedSemester)
+      semester: selectedSemester
     },
     { enabled: !!selectedSubject }
   );
@@ -42,7 +45,6 @@ export default function AdminGrades() {
       toast.success("Nota registrada com sucesso!");
       setLocalGrades({});
       setIsSaving(false);
-      // Recarregar notas existentes
       existingGradesQuery.refetch();
     },
     onError: (error) => {
@@ -51,7 +53,6 @@ export default function AdminGrades() {
     }
   });
 
-  // Atualizar notas existentes quando a query retorna dados
   useEffect(() => {
     if (existingGradesQuery.data && Array.isArray(existingGradesQuery.data)) {
       const gradesMap: Record<number, any> = {};
@@ -100,7 +101,7 @@ export default function AdminGrades() {
     recordGradeMutation.mutate({
       enrollmentId,
       subjectId: parseInt(selectedSubject),
-      semester: parseInt(selectedSemester),
+      semester: selectedSemester,
       firstBimester: studentGrades.firstBimester,
       secondBimester: studentGrades.secondBimester,
       thirdBimester: studentGrades.thirdBimester,
@@ -112,38 +113,33 @@ export default function AdminGrades() {
   const subjects = subjectsQuery.data || [];
   const students = studentsQuery.data || [];
 
-  // Função para verificar se o aluno já tem notas lançadas
-  const hasExistingGrades = (enrollmentId: number) => {
-    return !!existingGrades[enrollmentId];
-  };
+  // Organizar disciplinas por semestre para o seletor
+  const subjectsBySemester: Record<number, any[]> = {};
+  subjects.forEach(s => {
+    const sem = s.semester || 1;
+    if (!subjectsBySemester[sem]) subjectsBySemester[sem] = [];
+    subjectsBySemester[sem].push(s);
+  });
 
-  // Função para obter nota a ser exibida (existente ou local)
   const getDisplayGrade = (enrollmentId: number, bimester: string) => {
-    // Primeiro verifica se há uma alteração local
     const localGrade = localGrades[enrollmentId]?.[bimester];
-    if (localGrade !== undefined && localGrade !== null) {
-      return localGrade.toString();
-    }
+    if (localGrade !== undefined && localGrade !== null) return localGrade.toString();
     
-    // Se não há alteração local, retorna a nota existente
     const existingGrade = existingGrades[enrollmentId]?.[bimester];
-    if (existingGrade !== undefined && existingGrade !== null) {
-      return existingGrade.toString();
-    }
+    if (existingGrade !== undefined && existingGrade !== null) return existingGrade.toString();
     
-    // Se não há nada, retorna string vazia
     return "";
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
             <BarChart3 className="w-8 h-8 text-yellow-500" />
             Lançamento de Notas
           </h2>
-          <p className="text-slate-600 mt-1">Gerencie as notas dos alunos por curso e disciplina</p>
+          <p className="text-slate-600 mt-1">As disciplinas são organizadas automaticamente pelo semestre cadastrado</p>
         </div>
       </div>
 
@@ -152,21 +148,21 @@ export default function AdminGrades() {
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Search className="w-5 h-5 text-slate-400" />
-            Filtros de Seleção
+            Seleção de Curso e Disciplina
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Curso</label>
-              <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Selecione um curso" />
+              <label className="text-sm font-bold text-slate-700">1. Selecione o Curso</label>
+              <Select value={selectedCourse} onValueChange={(val) => { setSelectedCourse(val); setSelectedSubject(""); }}>
+                <SelectTrigger className="bg-white h-11">
+                  <SelectValue placeholder="Escolha um curso..." />
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map(course => (
                     <SelectItem key={course.id} value={course.id.toString()}>
-                      {course.name} ({course.code})
+                      {course.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -174,34 +170,27 @@ export default function AdminGrades() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Disciplina</label>
+              <label className="text-sm font-bold text-slate-700">2. Selecione a Disciplina (Organizada por Semestre)</label>
               <Select 
                 value={selectedSubject} 
                 onValueChange={setSelectedSubject}
                 disabled={!selectedCourse || subjectsQuery.isLoading}
               >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder={subjectsQuery.isLoading ? "Carregando..." : "Selecione uma disciplina"} />
+                <SelectTrigger className="bg-white h-11">
+                  <SelectValue placeholder={subjectsQuery.isLoading ? "Carregando..." : "Escolha a disciplina..."} />
                 </SelectTrigger>
                 <SelectContent>
-                  {subjects.map(subject => (
-                    <SelectItem key={subject.id} value={subject.id.toString()}>
-                      {subject.name} ({subject.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Semestre</label>
-              <Select value={selectedSemester} onValueChange={setSelectedSemester}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Selecione o semestre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
-                    <SelectItem key={s} value={s.toString()}>{s}º Semestre</SelectItem>
+                  {Object.keys(subjectsBySemester).sort((a, b) => Number(a) - Number(b)).map(sem => (
+                    <div key={sem}>
+                      <div className="px-2 py-1.5 text-[10px] font-black text-slate-400 uppercase bg-slate-50 tracking-widest">
+                        {sem}º Semestre
+                      </div>
+                      {subjectsBySemester[Number(sem)].map(subject => (
+                        <SelectItem key={subject.id} value={subject.id.toString()}>
+                          {subject.name} ({subject.code})
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                 </SelectContent>
               </Select>
@@ -215,27 +204,30 @@ export default function AdminGrades() {
         <CardHeader className="bg-slate-50 border-b border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Alunos Matriculados</CardTitle>
-              <CardDescription>Clique no nome do aluno para lançar notas</CardDescription>
+              <CardTitle className="text-lg">Alunos do Curso</CardTitle>
+              <CardDescription>
+                {selectedSubject ? (
+                  <span className="text-blue-600 font-medium">
+                    Lançando notas para: {currentSubject?.name} ({selectedSemester}º Semestre)
+                  </span>
+                ) : (
+                  "Selecione uma disciplina para começar o lançamento"
+                )}
+              </CardDescription>
             </div>
             {selectedCourse && (
               <div className="flex items-center gap-2 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                 <UserCheck className="w-4 h-4" />
-                {students.length} Alunos encontrados
+                {students.length} Alunos
               </div>
             )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {!selectedCourse ? (
+          {!selectedSubject ? (
             <div className="text-center py-20 text-slate-400">
-              <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>Selecione um curso para listar os alunos</p>
-            </div>
-          ) : studentsQuery.isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" />
-              <p className="text-slate-500">Buscando alunos...</p>
+              <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
+              <p>Selecione uma disciplina acima para listar os alunos e lançar as notas</p>
             </div>
           ) : students.length === 0 ? (
             <div className="text-center py-20 text-slate-400">
@@ -244,103 +236,84 @@ export default function AdminGrades() {
             </div>
           ) : (
             <div className="divide-y divide-slate-200">
-              {students.map((student) => {
-                const hasGrades = hasExistingGrades(student.enrollmentId);
-                
-                return (
-                  <div key={student.id}>
-                    <button
-                      onClick={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
-                      className="w-full px-6 py-4 hover:bg-slate-50 transition-colors flex items-center justify-between text-left"
-                    >
-                      <div className="flex-1">
-                        <div className="font-bold text-slate-900">{student.name}</div>
-                        <div className="text-xs text-slate-500">{student.email} • RA: {student.registrationNumber || "-"}</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {hasGrades && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-full flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            Notas Lançadas
-                          </span>
-                        )}
-                        {expandedStudent === student.id ? (
-                          <ChevronUp className="w-5 h-5 text-slate-400" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-slate-400" />
-                        )}
-                      </div>
-                    </button>
+              {students.map((student) => (
+                <div key={student.id} className="bg-white">
+                  <button
+                    onClick={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
+                    className="w-full px-6 py-4 hover:bg-slate-50 transition-colors flex items-center justify-between text-left"
+                  >
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900">{student.name}</div>
+                      <div className="text-xs text-slate-500">RA: {student.registrationNumber || student.id}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {existingGrades[student.enrollmentId] && (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-full flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Notas Lançadas
+                        </span>
+                      )}
+                      {expandedStudent === student.id ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                    </div>
+                  </button>
 
-                    {expandedStudent === student.id && (
-                      <div className="bg-slate-50/50 px-6 py-6 border-t border-slate-100">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                              Lançamento de Notas - {selectedSemester}º Semestre
-                            </h4>
-                            {hasGrades && (
-                              <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-                                ✓ Notas já existem - Você está editando
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {["firstBimester", "secondBimester", "thirdBimester", "fourthBimester"].map((bimester, idx) => (
-                              <div key={bimester} className="space-y-2">
-                                <label className="text-xs font-bold text-slate-700">{idx + 1}º Bimestre</label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="10"
-                                  step="0.5"
-                                  placeholder="0-10"
-                                  value={getDisplayGrade(student.enrollmentId, bimester)}
-                                  onChange={(e) => handleGradeChange(student.enrollmentId, bimester, e.target.value)}
-                                  className="bg-white border-slate-300"
-                                />
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setLocalGrades(prev => {
-                                  const newGrades = { ...prev };
-                                  delete newGrades[student.enrollmentId];
-                                  return newGrades;
-                                });
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button
-                              className="bg-green-600 hover:bg-green-700"
-                              onClick={() => handleSaveGrades(student.enrollmentId)}
-                              disabled={isSaving || recordGradeMutation.isPending}
-                            >
-                              {isSaving || recordGradeMutation.isPending ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Salvando...
-                                </>
-                              ) : (
-                                <>
-                                  <Save className="w-4 h-4 mr-2" />
-                                  Salvar Notas
-                                </>
-                              )}
-                            </Button>
-                          </div>
+                  {expandedStudent === student.id && (
+                    <div className="px-6 py-6 bg-slate-50 border-t border-slate-100">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase">Avaliação</label>
+                          <Input
+                            type="number"
+                            placeholder="0.0"
+                            value={getDisplayGrade(student.enrollmentId, "firstBimester")}
+                            onChange={(e) => handleGradeChange(student.enrollmentId, "firstBimester", e.target.value)}
+                            className="bg-white border-slate-300 h-10"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase">Trabalho</label>
+                          <Input
+                            type="number"
+                            placeholder="0.0"
+                            value={getDisplayGrade(student.enrollmentId, "secondBimester")}
+                            onChange={(e) => handleGradeChange(student.enrollmentId, "secondBimester", e.target.value)}
+                            className="bg-white border-slate-300 h-10"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase">Frequência</label>
+                          <Input
+                            type="number"
+                            placeholder="0.0"
+                            value={getDisplayGrade(student.enrollmentId, "thirdBimester")}
+                            onChange={(e) => handleGradeChange(student.enrollmentId, "thirdBimester", e.target.value)}
+                            className="bg-white border-slate-300 h-10"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase">Substitutiva</label>
+                          <Input
+                            type="number"
+                            placeholder="0.0"
+                            value={getDisplayGrade(student.enrollmentId, "fourthBimester")}
+                            onChange={(e) => handleGradeChange(student.enrollmentId, "fourthBimester", e.target.value)}
+                            className="bg-white border-slate-300 h-10"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            className="w-full bg-green-600 hover:bg-green-700 text-white h-10 font-bold"
+                            onClick={() => handleSaveGrades(student.enrollmentId)}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Salvar</>}
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

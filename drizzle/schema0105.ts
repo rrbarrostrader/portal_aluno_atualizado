@@ -15,7 +15,7 @@ import {
 // ============================================
 // ENUMS - Definidos PRIMEIRO, fora das tabelas
 // ============================================
-export const roleEnum = pgEnum("role", ["user", "admin", "teacher"]);
+export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const statusEnum = pgEnum("status", ["active", "inactive", "suspended"]);
 export const courseTypeEnum = pgEnum("course_type", ["graduation", "postgraduate", "technical"]);
 export const courseStatusEnum = pgEnum("course_status", ["active", "inactive"]);
@@ -26,15 +26,13 @@ export const attendanceStatusEnum = pgEnum("attendance_status", ["good", "warnin
 export const announcementTypeEnum = pgEnum("announcement_type", ["general", "academic", "financial", "administrative"]);
 export const announcementTargetEnum = pgEnum("announcement_target", ["all", "students", "admins"]);
 export const announcementPriorityEnum = pgEnum("announcement_priority", ["low", "medium", "high"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "overdue", "cancelled", "refunded"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["pix", "credit_card", "bank_slip", "cash"]);
 
 // ============================================
 // TABELAS - Usam os enums definidos acima
 // ============================================
 
 /**
- * Tabela de usuários - Alunos, Professores e Administradores
+ * Tabela de usuários - Alunos e Administradores
  */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -50,11 +48,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("createdat").defaultNow().notNull(), // Mapeado para 'createdat'
   updatedAt: timestamp("updatedat").defaultNow().notNull(), // Mapeado para 'updatedat'
   lastSignedIn: timestamp("lastsignedin").defaultNow().notNull(), // Mapeado para 'lastsignedin'
-  cpf: varchar("cpf", { length: 14 }).unique(),
-  rg: varchar("rg", { length: 20 }),
-  birthDate: date("birthdate"),
-  address: text("address"),
-  phone: varchar("phone", { length: 20 }),
 });
 
 export type User = typeof users.$inferSelect;
@@ -239,45 +232,3 @@ export const auditLogs = pgTable("auditLogs", {
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
-
-/**
- * Tabela de pagamentos e mensalidades
- */
-export const payments = pgTable("payments", {
-  id: serial("id").primaryKey(),
-  userId: integer("userid").notNull(),
-  enrollmentId: integer("enrollmentid"),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  interestAmount: decimal("interestamount", { precision: 10, scale: 2 }).default("0.00"), // Juros acumulados
-  penaltyAmount: decimal("penaltyamount", { precision: 10, scale: 2 }).default("0.00"),  // Multa fixa
-  totalAmount: decimal("totalamount", { precision: 10, scale: 2 }).notNull(),            // Valor original + juros + multa
-  dueDate: date("duedate").notNull(),
-  status: paymentStatusEnum("status").default("pending").notNull(),
-  paymentMethod: paymentMethodEnum("payment_method"),
-  paymentDate: timestamp("paymentdate"),
-  transactionId: varchar("transactionid", { length: 255 }),
-  pixCode: text("pixcode"),
-  barcode: text("barcode"),
-  receiptUrl: text("receipturl"),
-  createdAt: timestamp("createdat").defaultNow().notNull(),
-  updatedAt: timestamp("updatedat").defaultNow().notNull(),
-});
-
-export type Payment = typeof payments.$inferSelect;
-export type InsertPayment = typeof payments.$inferInsert;
-
-/**
- * Tabela de configurações financeiras (Juros, Multas, etc)
- */
-export const financialSettings = pgTable("financialSettings", {
-  id: serial("id").primaryKey(),
-  dailyInterestRate: decimal("dailyinterestrate", { precision: 5, scale: 2 }).default("0.00").notNull(), // Porcentagem de juros diários
-  fixedPenaltyRate: decimal("fixedpenaltyrate", { precision: 5, scale: 2 }).default("0.00").notNull(),  // Porcentagem de multa fixa por atraso
-  gracePeriodDays: integer("graceperioddays").default(0).notNull(),                                      // Dias de carência
-  updatedAt: timestamp("updatedat").defaultNow().notNull(),
-});
-
-export type FinancialSetting = typeof financialSettings.$inferSelect;
-export type InsertFinancialSetting = typeof financialSettings.$inferInsert;

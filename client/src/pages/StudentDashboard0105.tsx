@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { LogOut, BookOpen, FileText, BarChart3, Bell, CreditCard, Loader2, TrendingUp, Contact2 } from "lucide-react";
+import { LogOut, BookOpen, FileText, BarChart3, Bell, CreditCard, Loader2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
@@ -21,7 +21,7 @@ export default function StudentDashboard() {
   const enrollmentsQuery = trpc.students.getMyEnrollments.useQuery();
 
   // Buscar avisos recentes
-  const announcementsQuery = trpc.announcements.list.useQuery();
+  const announcementsQuery = trpc.announcements.getPublished.useQuery();
 
   // Buscar todas as notas do aluno para calcular estatísticas
   const [selectedEnrollment, setSelectedEnrollment] = useState<number | null>(null);
@@ -168,7 +168,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Cards de Atalhos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Card 
             className="hover:shadow-lg transition-shadow cursor-pointer"
             onClick={() => setLocation("/student/boletim")}
@@ -241,21 +241,6 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-600">Gerencie suas mensalidades</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer border-blue-100 bg-blue-50/30"
-            onClick={() => setLocation("/student/carteirinha")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Contact2 className="w-5 h-5 text-blue-600" />
-                Carteirinha
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Sua identificação estudantil digital</p>
             </CardContent>
           </Card>
         </div>

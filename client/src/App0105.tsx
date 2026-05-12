@@ -12,7 +12,6 @@ import StudentSecretaria from "./pages/StudentSecretaria";
 import StudentAcademic from "./pages/StudentAcademic";
 import StudentAnnouncements from "./pages/StudentAnnouncements";
 import StudentPayment from "./pages/StudentPayment";
-import StudentID from "./pages/StudentID";
 import AdminDashboard from "./pages/AdminDashboard";
 import { ChangePasswordRequired } from "./pages/ChangePasswordRequired";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -91,10 +90,6 @@ function Router() {
       <Route
         path={"/student/pagamento"}
         component={() => <ProtectedRoute component={StudentPayment} requiredRole="user" />}
-      />
-      <Route
-        path={"/student/carteirinha"}
-        component={() => <ProtectedRoute component={StudentID} requiredRole="user" />}
       />
       
       {/* Rotas do Admin */}
