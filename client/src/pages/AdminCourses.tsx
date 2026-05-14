@@ -1,554 +1,146 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit2, Trash2, Loader2, BookOpen, ChevronRight, ChevronDown, Save, X, Hash } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookOpen, Plus, Trash2, Layers, Clock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Checkbox } from "@/components/ui/checkbox";
 
 export default function AdminCourses() {
-  const [isAddingCourse, setIsAddingCourse] = useState(false);
-  const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
-  const [isAddingSubject, setIsAddingSubject] = useState<number | null>(null);
-  const [editingCourse, setEditingCourse] = useState<number | null>(null);
-  const [courseSubjects, setCourseSubjects] = useState<Record<number, any[]>>({});
+  const [activeTab, setActiveTab] = useState<"courses" | "subjects">("courses");
   
-  const [newCourse, setNewCourse] = useState({
-    name: "",
-    code: "",
-    description: "",
-    type: "graduation" as const,
-    duration: 3000,
-    semesters: 8,
-  });
+  // States Curso
+  const [courseName, setCourseName] = useState("");
+  const [courseHours, setCourseHours] = useState("");
 
-  const [editCourse, setEditCourse] = useState({
-    id: 0,
-    name: "",
-    description: "",
-    status: "active" as const,
-    semesters: 8,
-  });
+  // States Disciplina
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [subName, setSubName] = useState("");
+  const [subSemester, setSubSemester] = useState("");
+  const [subHours, setSubHours] = useState("");
 
-  const [newSubject, setNewSubject] = useState({
-    name: "",
-    code: "AUTO", // Código automático por padrão
-    description: "",
-    credits: 4,
-    workload: 60,
-    courseHours: 60,
-    semester: 1,
-  });
-
-  // Queries
-  const coursesQuery = trpc.courses.list.useQuery();
+  const utils = trpc.useUtils();
+  const { data: courses, isLoading: loadingCourses } = trpc.courses.list.useQuery();
   
-  const createMutation = trpc.courses.create.useMutation({
-    onSuccess: () => {
-      toast.success("Curso criado com sucesso!");
-      setNewCourse({
-        name: "",
-        code: "",
-        description: "",
-        type: "graduation",
-        duration: 3000,
-        semesters: 8,
-      });
-      setIsAddingCourse(false);
-      coursesQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar curso");
-    },
-  });
-
-  const updateMutation = trpc.courses.update.useMutation({
-    onSuccess: () => {
-      toast.success("Curso atualizado com sucesso!");
-      setEditingCourse(null);
-      coursesQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao atualizar curso");
-    },
-  });
-
-  const deleteMutation = trpc.courses.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Curso deletado com sucesso!");
-      coursesQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao deletar curso");
-    },
-  });
-
-  const createSubjectMutation = trpc.courses.createSubject.useMutation({
-    onSuccess: () => {
-      toast.success("Disciplina cadastrada com sucesso!");
-      setNewSubject({
-        name: "",
-        code: "AUTO",
-        description: "",
-        credits: 4,
-        workload: 60,
-        courseHours: 60,
-        semester: 1,
-      });
-      setIsAddingSubject(null);
-      if (expandedCourse) {
-        fetchSubjects(expandedCourse);
-      }
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao cadastrar disciplina");
-    },
-  });
-
-  const subjectsQuery = trpc.courses.listSubjects.useQuery(
-    { courseId: expandedCourse || 0 },
-    { enabled: !!expandedCourse }
+  const { data: subjects } = trpc.courses.listSubjects.useQuery(
+    { courseId: Number(selectedCourse) },
+    { enabled: !!selectedCourse }
   );
 
-  const fetchSubjects = async (courseId: number) => {
-    try {
-      const subjects = await trpc.courses.listSubjects.query({ courseId });
-      setCourseSubjects(prev => ({
-        ...prev,
-        [courseId]: subjects
-      }));
-    } catch (error) {
-      console.error("Erro ao buscar disciplinas:", error);
+  const createCourse = trpc.courses.create.useMutation({
+    onSuccess: () => {
+      toast.success("Curso criado com sucesso!");
+      setCourseName(""); setCourseHours("");
+      utils.courses.list.invalidate();
     }
-  };
-
-  const handleAddCourse = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCourse.name || !newCourse.code) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-    createMutation.mutate(newCourse);
-  };
-
-  const handleEditCourse = (course: any) => {
-    setEditingCourse(course.id);
-    setEditCourse({
-      id: course.id,
-      name: course.name,
-      description: course.description || "",
-      status: course.status || "active",
-      semesters: course.semesters || 8,
-    });
-  };
-
-  const handleSaveCourse = () => {
-    if (!editCourse.name) {
-      toast.error("Preencha o nome do curso");
-      return;
-    }
-    updateMutation.mutate({
-      id: editCourse.id,
-      name: editCourse.name,
-      description: editCourse.description,
-      status: editCourse.status,
-      semesters: editCourse.semesters,
-    });
-  };
-
-  const handleAddSubject = (courseId: number) => {
-    if (!newSubject.name) {
-      toast.error("Preencha o nome da disciplina");
-      return;
-    }
-    
-    // Se o código for AUTO, geramos um baseado no nome ou timestamp
-    let finalCode = newSubject.code;
-    if (finalCode === "AUTO" || !finalCode) {
-      const prefix = newSubject.name.substring(0, 3).toUpperCase();
-      const random = Math.floor(100 + Math.random() * 900);
-      finalCode = `${prefix}-${random}`;
-    }
-
-    createSubjectMutation.mutate({
-      ...newSubject,
-      code: finalCode,
-      courseId,
-    });
-  };
-
-  const handleDeleteCourse = (id: number) => {
-    if (confirm("Tem certeza que deseja deletar este curso?")) {
-      deleteMutation.mutate({ id });
-    }
-  };
-
-  const handleExpandCourse = (courseId: number) => {
-    if (expandedCourse === courseId) {
-      setExpandedCourse(null);
-    } else {
-      setExpandedCourse(courseId);
-      fetchSubjects(courseId);
-    }
-  };
-
-  const courses = coursesQuery.data || [];
-  const subjects = courseSubjects[expandedCourse || 0] || subjectsQuery.data || [];
-  
-  // Organizar disciplinas por semestre
-  const subjectsBySemester: Record<number, any[]> = {};
-  subjects.forEach(s => {
-    const sem = s.semester || 1;
-    if (!subjectsBySemester[sem]) subjectsBySemester[sem] = [];
-    subjectsBySemester[sem].push(s);
   });
 
-  const renderCourseList = (type: string, title: string) => {
-    const filteredCourses = courses.filter(c => c.type === type);
-    if (filteredCourses.length === 0) return null;
+  const createSubject = trpc.courses.createSubject.useMutation({
+    onSuccess: () => {
+      toast.success("Disciplina vinculada!");
+      setSubName(""); setSubHours(""); setSubSemester("");
+      utils.courses.listSubjects.invalidate();
+    }
+  });
 
-    return (
-      <div className="mb-8">
-        <h3 className="text-xl font-semibold text-slate-900 mb-4">{title} ({filteredCourses.length})</h3>
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700 w-12"></th>
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700">Código</th>
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700">Nome do Curso</th>
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700">Duração</th>
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700">Semestres</th>
-                <th className="px-6 py-3 text-sm font-semibold text-slate-700 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredCourses.map((course) => (
-                <React.Fragment key={course.id}>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <Checkbox id={`course-${course.id}`} />
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{course.code}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{course.name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{course.duration}h</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{course.semesters || 8}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          onClick={() => handleExpandCourse(course.id)}
-                        >
-                          <BookOpen className="w-4 h-4 mr-1" />
-                          Disciplinas
-                          {expandedCourse === course.id ? <ChevronDown className="w-4 h-4 ml-1" /> : <ChevronRight className="w-4 h-4 ml-1" />}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          onClick={() => handleEditCourse(course)}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteCourse(course.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedCourse === course.id && (
-                    <tr className="bg-slate-50/50">
-                      <td colSpan={6} className="px-12 py-6">
-                        <div className="space-y-6">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Gerenciamento de Disciplinas</h4>
-                            <Button 
-                              size="sm" 
-                              className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 text-xs font-bold"
-                              onClick={() => setIsAddingSubject(course.id)}
-                            >
-                              <Plus className="w-3 h-3 mr-1" /> Adicionar Disciplina
-                            </Button>
-                          </div>
-
-                          {isAddingSubject === course.id && (
-                            <Card className="border-yellow-200 bg-yellow-50/30">
-                              <CardContent className="pt-6">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                                  <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Nome da Disciplina</label>
-                                    <input 
-                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md"
-                                      placeholder="Ex: Português"
-                                      value={newSubject.name}
-                                      onChange={(e) => setNewSubject({...newSubject, name: e.target.value})}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Código (Deixe AUTO para automático)</label>
-                                    <div className="relative">
-                                      <input 
-                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md pr-10"
-                                        placeholder="Ex: PORT-001"
-                                        value={newSubject.code}
-                                        onChange={(e) => setNewSubject({...newSubject, code: e.target.value})}
-                                      />
-                                      <Hash className="w-4 h-4 absolute right-3 top-2.5 text-slate-400" />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Semestre</label>
-                                    <select 
-                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md"
-                                      value={newSubject.semester}
-                                      onChange={(e) => setNewSubject({...newSubject, semester: parseInt(e.target.value)})}
-                                    >
-                                      {Array.from({length: course.semesters || 8}, (_, i) => i + 1).map(sem => (
-                                        <option key={sem} value={sem}>{sem}º Semestre</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">Carga Horária (H)</label>
-                                    <input 
-                                      type="number"
-                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md"
-                                      placeholder="Ex: 60"
-                                      value={newSubject.courseHours}
-                                      onChange={(e) => setNewSubject({...newSubject, courseHours: parseInt(e.target.value), workload: parseInt(e.target.value)})}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex gap-2 justify-end">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => setIsAddingSubject(null)}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={() => handleAddSubject(course.id)}
-                                  >
-                                    <Save className="w-3 h-3 mr-1" /> Salvar Disciplina
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          )}
-
-                          {/* Listagem Organizada por Semestre */}
-                          <div className="space-y-6">
-                            {Array.from({length: course.semesters || 8}, (_, i) => i + 1).map(sem => {
-                              const semSubjects = subjectsBySemester[sem] || [];
-                              if (semSubjects.length === 0 && !isAddingSubject) return null;
-                              if (semSubjects.length === 0) return null;
-
-                              return (
-                                <div key={sem} className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-px flex-1 bg-slate-200"></div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{sem}º Semestre</span>
-                                    <div className="h-px flex-1 bg-slate-200"></div>
-                                  </div>
-                                  <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                    <table className="w-full text-left text-sm">
-                                      <thead>
-                                        <tr className="bg-slate-50/50 border-b border-slate-200">
-                                          <th className="px-4 py-2 font-bold text-slate-600 w-32">Código</th>
-                                          <th className="px-4 py-2 font-bold text-slate-600">Nome da Disciplina</th>
-                                          <th className="px-4 py-2 font-bold text-slate-600 text-center w-24">C.H</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {semSubjects.map((subject) => (
-                                          <tr key={subject.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-4 py-2 text-slate-900 font-mono text-xs">{subject.code}</td>
-                                            <td className="px-4 py-2 text-slate-700 font-medium">{subject.name}</td>
-                                            <td className="px-4 py-2 text-slate-600 text-center">{subject.courseHours || subject.workload}h</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            
-                            {subjects.length === 0 && (
-                              <div className="text-center py-12 bg-white border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
-                                <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                <p>Nenhuma disciplina cadastrada neste curso.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  if (coursesQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
+  const deleteCourse = trpc.courses.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Curso e dependências removidos!");
+      utils.courses.list.invalidate();
+    }
+  });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Gerenciar Cursos</h1>
-          <p className="text-slate-600 mt-1">Configure a grade curricular e os semestres dos cursos</p>
-        </div>
-        <div className="flex gap-2">
+    <div className="p-6 max-w-6xl mx-auto space-y-8">
+      <div className="flex items-center justify-between border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-slate-900">Gestão Acadêmica</h1>
+        <div className="flex bg-slate-100 p-1 rounded-lg">
           <Button 
-            onClick={() => setIsAddingCourse(!isAddingCourse)}
-            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold shadow-sm"
+            variant={activeTab === "courses" ? "default" : "ghost"} 
+            onClick={() => setActiveTab("courses")}
+            className="rounded-md"
           >
-            <Plus className="w-4 h-4 mr-2" /> Novo Curso
+            Cursos
+          </Button>
+          <Button 
+            variant={activeTab === "subjects" ? "default" : "ghost"} 
+            onClick={() => setActiveTab("subjects")}
+            className="rounded-md"
+          >
+            Disciplinas
           </Button>
         </div>
       </div>
 
-      {isAddingCourse && (
-        <Card className="border-yellow-200 bg-yellow-50/30 shadow-md">
-          <CardHeader>
-            <CardTitle>Criar Novo Curso</CardTitle>
-            <CardDescription>Preencha as informações básicas para criar um novo curso no sistema</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddCourse} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Nome do Curso</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
-                    placeholder="Ex: Administração"
-                    value={newCourse.name}
-                    onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Código</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
-                    placeholder="Ex: ADM-001"
-                    value={newCourse.code}
-                    onChange={(e) => setNewCourse({...newCourse, code: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Duração Total (horas)</label>
-                  <input 
-                    type="number"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
-                    value={newCourse.duration}
-                    onChange={(e) => setNewCourse({...newCourse, duration: parseInt(e.target.value)})}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Quantidade de Semestres</label>
-                  <select 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
-                    value={newCourse.semesters}
-                    onChange={(e) => setNewCourse({...newCourse, semesters: parseInt(e.target.value)})}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(num => (
-                      <option key={num} value={num}>{num} Semestres</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Tipo de Curso</label>
-                  <select 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-yellow-400 outline-none"
-                    value={newCourse.type}
-                    onChange={(e) => setNewCourse({...newCourse, type: e.target.value as any})}
-                  >
-                    <option value="graduation">Graduação</option>
-                    <option value="postgraduate">Pós-Graduação</option>
-                    <option value="extension">Extensão</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsAddingCourse(false)}>Cancelar</Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
-                  <Save className="w-4 h-4 mr-2" /> Criar Curso
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      {activeTab === "courses" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Formulário */}
+          <Card className="lg:col-span-1 shadow-md h-fit">
+            <CardHeader><CardTitle className="text-lg">Novo Curso</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <Input placeholder="Nome do Curso" value={courseName} onChange={e => setCourseName(e.target.value)} />
+              <Input type="number" placeholder="Carga Horária Total" value={courseHours} onChange={e => setCourseHours(e.target.value)} />
+              <Button className="w-full" onClick={() => createCourse.mutate({ name: courseName, totalHours: Number(courseHours) })}>
+                {createCourse.isLoading ? <Loader2 className="animate-spin" /> : <><Plus className="w-4 h-4 mr-2" /> Criar Curso</>}
+              </Button>
+            </CardContent>
+          </Card>
 
-      {editingCourse && (
-        <Card className="border-blue-200 bg-blue-50/30 shadow-md">
-          <CardHeader>
-            <CardTitle>Editar Curso</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Nome</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
-                    value={editCourse.name}
-                    onChange={(e) => setEditCourse({...editCourse, name: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Semestres</label>
-                  <select 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md"
-                    value={editCourse.semesters}
-                    onChange={(e) => setEditCourse({...editCourse, semesters: parseInt(e.target.value)})}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12].map(num => (
-                      <option key={num} value={num}>{num} Semestres</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancelar</Button>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSaveCourse}>
-                  <Save className="w-4 h-4 mr-2" /> Salvar Alterações
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Listagem em tempo real */}
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="text-xl font-bold flex items-center gap-2"><BookOpen className="text-blue-600" /> Cursos Ativos</h2>
+            {loadingCourses ? <Loader2 className="animate-spin mx-auto" /> : courses?.map(c => (
+              <Card key={c.id} className="hover:border-blue-300 transition-colors">
+                <CardContent className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-slate-800">{c.name}</p>
+                    <p className="text-xs text-slate-500">{c.totalHours}h • Código: {c.code}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteCourse.mutate({ id: c.id })}>
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-1 shadow-md h-fit">
+            <CardHeader><CardTitle className="text-lg">Vincular Disciplina</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                <SelectTrigger><SelectValue placeholder="Selecione o Curso" /></SelectTrigger>
+                <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Input placeholder="Nome da Disciplina" value={subName} onChange={e => setSubName(e.target.value)} />
+              <Input type="number" placeholder="Semestre (Ex: 1)" value={subSemester} onChange={e => setSubSemester(e.target.value)} />
+              <Input type="number" placeholder="Carga Horária" value={subHours} onChange={e => setSubHours(e.target.value)} />
+              <Button className="w-full bg-indigo-600" onClick={() => createSubject.mutate({
+                name: subName, courseId: Number(selectedCourse), semester: Number(subSemester), hours: Number(subHours)
+              })}>
+                {createSubject.isLoading ? <Loader2 className="animate-spin" /> : "Adicionar à Grade"}
+              </Button>
+            </CardContent>
+          </Card>
 
-      <div className="space-y-8">
-        {renderCourseList("graduation", "Graduação")}
-        {renderCourseList("postgraduate", "Pós-Graduação")}
-        {renderCourseList("extension", "Extensão")}
-      </div>
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="text-xl font-bold flex items-center gap-2"><Layers className="text-indigo-600" /> Grade Curricular</h2>
+            {!selectedCourse ? <p className="text-slate-400 italic">Selecione um curso para ver as disciplinas...</p> : subjects?.map(s => (
+              <div key={s.id} className="p-4 bg-white border rounded-xl flex justify-between items-center shadow-sm">
+                <div>
+                  <p className="font-semibold">{s.name}</p>
+                  <div className="flex gap-3 text-xs text-slate-500 mt-1">
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">{s.semester}º Semestre</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {s.hours}h</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

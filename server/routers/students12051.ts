@@ -302,6 +302,7 @@ export const studentsRouter = router({
           enrollmentDate: enrollments.enrollmentDate,
           status: enrollments.status,
           registrationNumber: enrollments.registrationNumber,
+          currentSemester: enrollments.currentSemester,
         })
         .from(enrollments)
         .innerJoin(courses, eq(enrollments.courseId, courses.id))
@@ -366,15 +367,15 @@ export const studentsRouter = router({
       // Formatar data atual para YYYY-MM-DD (compatível com PostgreSQL DATE)
       const today = new Date().toISOString().split('T')[0];
 
-      // CORREÇÃO: Cria a matrícula vinculando o aluno ao curso selecionado
-      if (input.courseId && input.role === "user") {
+      // Cria a matrícula apenas se houver courseId (para alunos)
+      if (input.courseId) {
         await db.insert(enrollments).values({
           userId: userId,
           courseId: input.courseId,
           enrollmentDate: today,
           status: "active",
           currentSemester: 1,
-          registrationNumber: input.registrationNumber || `MAT-${Date.now()}`,
+          registrationNumber: input.registrationNumber,
         });
       }
 
