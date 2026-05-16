@@ -16,7 +16,7 @@ export default function StudentGrades() {
   // Buscar matrículas do aluno
   const enrollmentsQuery = trpc.students.getMyEnrollments.useQuery();
 
-  // Buscar notas do aluno - APENAS quando enrollment está pronto
+  // Buscar notas do aluno
   const gradesQuery = trpc.students.getMyGrades.useQuery(
     { 
       enrollmentId: selectedEnrollment || 0, 
@@ -25,16 +25,8 @@ export default function StudentGrades() {
     { 
       enabled: !!selectedEnrollment && isEnrollmentReady,
       refetchOnWindowFocus: true,
-      staleTime: 0,
     }
   );
-
-  // Refetch quando semestre ou enrollment mudam
-  useEffect(() => {
-    if (selectedEnrollment && isEnrollmentReady) {
-      gradesQuery.refetch();
-    }
-  }, [selectedSemester, selectedEnrollment]);
 
   // Selecionar a primeira matrícula automaticamente
   useEffect(() => {
@@ -50,240 +42,140 @@ export default function StudentGrades() {
   const grades = gradesQuery.data || [];
   const currentEnrollment = enrollments.find(e => e.id === selectedEnrollment);
 
-  // Função para calcular média com MÁXIMA segurança
+  // Função para calcular média tratando strings numéricas do Postgres
   const calculateAverage = (gradeItem: any): string => {
-    try {
-      if (!gradeItem || typeof gradeItem !== 'object') {
-        return "-";
-      }
+    if (!gradeItem) return "-";
 
-      const bim1 = gradeItem.firstBimester !== null ? parseFloat(gradeItem.firstBimester) : null;
-      const bim2 = gradeItem.secondBimester !== null ? parseFloat(gradeItem.secondBimester) : null;
-      const bim3 = gradeItem.thirdBimester !== null ? parseFloat(gradeItem.thirdBimester) : null;
-      const bim4 = gradeItem.fourthBimester !== null ? parseFloat(gradeItem.fourthBimester) : null;
+    const bim1 = gradeItem.firstBimester ? parseFloat(gradeItem.firstBimester) : null;
+    const bim2 = gradeItem.secondBimester ? parseFloat(gradeItem.secondBimester) : null;
+    const bim3 = gradeItem.thirdBimester ? parseFloat(gradeItem.thirdBimester) : null;
+    const bim4 = gradeItem.fourthBimester ? parseFloat(gradeItem.fourthBimester) : null;
 
-      const validGrades = [bim1, bim2, bim3, bim4].filter((g): g is number => g !== null && !isNaN(g));
+    const validGrades = [bim1, bim2, bim3, bim4].filter((g): g is number => g !== null && !isNaN(g));
 
-      if (validGrades.length === 0) {
-        return "-";
-      }
+    if (validGrades.length === 0) return "-";
 
-      const average = validGrades.reduce((a, b) => a + b, 0) / validGrades.length;
-
-      if (typeof average === 'number' && !isNaN(average) && isFinite(average)) {
-        return average.toFixed(1);
-      }
-
-      return "-";
-    } catch (error) {
-      console.error("Erro ao calcular média:", error);
-      return "-";
-    }
+    const average = validGrades.reduce((a, b) => a + b, 0) / validGrades.length;
+    return average.toFixed(1);
   };
 
-  // Função para determinar cor da média
-  const getAverageColor = (gradeItem: any): string => {
-    try {
-      if (!gradeItem) return "text-slate-300";
+  const getStatusColor = (gradeItem: any) => {
+    const avgStr = calculateAverage(gradeItem);
+    if (avgStr === "-") return "bg-slate-100 text-slate-600";
+    const avg = parseFloat(avgStr);
+    if (avg >= 7) return "bg-green-100 text-green-700";
+    if (avg >= 5) return "bg-yellow-100 text-yellow-700";
+    return "bg-red-100 text-red-700";
+  };
 
-      const bim1 = gradeItem.firstBimester !== null ? parseFloat(gradeItem.firstBimester) : null;
-      const bim2 = gradeItem.secondBimester !== null ? parseFloat(gradeItem.secondBimester) : null;
-      const bim3 = gradeItem.thirdBimester !== null ? parseFloat(gradeItem.thirdBimester) : null;
-      const bim4 = gradeItem.fourthBimester !== null ? parseFloat(gradeItem.fourthBimester) : null;
-
-      const validGrades = [bim1, bim2, bim3, bim4].filter((g): g is number => g !== null && !isNaN(g));
-      
-      if (validGrades.length === 0) {
-        return "text-slate-300";
-      }
-
-      const average = validGrades.reduce((a, b) => a + b, 0) / validGrades.length;
-
-      if (average >= 7) return "text-green-600";
-      if (average >= 5) return "text-yellow-600";
-      return "text-red-600";
-    } catch {
-      return "text-slate-300";
-    }
+  const getStatusText = (gradeItem: any) => {
+    const avgStr = calculateAverage(gradeItem);
+    if (avgStr === "-") return "Pendente";
+    const avg = parseFloat(avgStr);
+    if (avg >= 7) return "Aprovado";
+    if (avg >= 5) return "Recuperação";
+    return "Reprovado";
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Cabeçalho */}
-      <header className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => setLocation("/student")}
-                className="p-2 hover:bg-slate-100 rounded-full"
-              >
-                <ArrowLeft className="w-5 h-5 text-slate-600" />
+              <Button variant="ghost" onClick={() => setLocation("/student")} className="p-2">
+                <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Boletim Acadêmico</h1>
-                <p className="text-slate-500 font-medium">Acompanhe seu desempenho escolar</p>
+                <h1 className="text-2xl font-bold text-slate-900">Meu Boletim</h1>
+                <p className="text-sm text-slate-500">{currentEnrollment?.courseName || "Carregando..."}</p>
               </div>
             </div>
-            {currentEnrollment && (
-              <div className="hidden md:block text-right">
-                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Curso Atual</p>
-                <p className="text-lg font-black text-yellow-600">{currentEnrollment.courseName}</p>
-              </div>
-            )}
+            <div className="bg-yellow-50 px-4 py-2 rounded-xl border border-yellow-200 hidden md:block">
+              <span className="text-xs font-bold text-yellow-600 uppercase">RA: {currentEnrollment?.registrationNumber || "---"}</span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {enrollmentsQuery.isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-12 h-12 text-yellow-500 animate-spin mb-4" />
-            <p className="text-slate-500 font-bold">Carregando suas informações...</p>
-          </div>
-        ) : enrollments.length === 0 ? (
-          <Card className="border-none shadow-sm">
-            <CardContent className="flex flex-col items-center justify-center py-20">
-              <GraduationCap className="w-16 h-16 text-slate-200 mb-4" />
-              <h3 className="text-xl font-bold text-slate-900">Nenhuma matrícula encontrada</h3>
-              <p className="text-slate-500">Você ainda não possui matrículas ativas no sistema.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-8">
-            {/* Seletor de Matrícula e Semestre */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <Card className="border-none shadow-sm lg:col-span-1">
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold">Suas Matrículas</CardTitle>
-                  <CardDescription>Selecione o curso desejado</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {enrollments.map((enrollment) => (
-                    <button
-                      key={enrollment.id}
-                      onClick={() => {
-                        setSelectedEnrollment(enrollment.id);
-                        setSelectedSemester(enrollment.currentSemester || 1);
-                        setIsEnrollmentReady(true);
-                      }}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        selectedEnrollment === enrollment.id
-                          ? "border-yellow-400 bg-yellow-50 shadow-sm"
-                          : "border-slate-100 hover:border-slate-200 bg-white"
-                      }`}
-                    >
-                      <p className={`font-bold ${selectedEnrollment === enrollment.id ? "text-yellow-900" : "text-slate-700"}`}>
-                        {enrollment.courseName}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">RA: {enrollment.registrationNumber || "N/A"}</p>
-                    </button>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold">Semestre Letivo</CardTitle>
-                  <CardDescription>Escolha o período para visualizar as notas</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-3">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => (
-                      <Button
-                        key={semester}
-                        variant={selectedSemester === semester ? "default" : "outline"}
-                        onClick={() => {
-                          setSelectedSemester(semester);
-                          setIsEnrollmentReady(true);
-                        }}
-                        className={`h-12 px-6 font-bold rounded-xl ${
-                          selectedSemester === semester 
-                            ? "bg-slate-900 text-white hover:bg-slate-800" 
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        {semester}º Semestre
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Tabela de Notas */}
-            <Card className="border-none shadow-sm overflow-hidden">
-              <CardHeader className="bg-white border-b border-slate-100 pb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-black text-slate-900">Notas e Desempenho</CardTitle>
-                    <CardDescription>Detalhamento por disciplina no {selectedSemester}º semestre</CardDescription>
-                  </div>
-                  <div className="p-3 bg-yellow-50 rounded-2xl text-yellow-600">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Seletor de Semestre */}
+          <div className="lg:col-span-1 space-y-4">
+            <Card className="border-none shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-bold uppercase text-slate-400">Semestres</CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                {gradesQuery.isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" />
-                    <p className="text-slate-500 font-medium">Buscando notas do {selectedSemester}º semestre...</p>
-                  </div>
-                ) : grades.length === 0 ? (
-                  <div className="text-center py-20">
-                    <p className="text-slate-400 italic">Nenhuma disciplina ou nota encontrada para o {selectedSemester}º semestre.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">Disciplina</th>
-                          <th className="px-4 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Avaliação</th>
-                          <th className="px-4 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Trabalho</th>
-                          <th className="px-4 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Frequência</th>
-                          <th className="px-4 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Subst.</th>
-                          <th className="px-4 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Média</th>
-                          <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {grades.map((grade: any) => (
-                          <tr key={grade.subjectId} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-slate-900">{grade.subjectName}</div>
-                              <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">{grade.subjectCode} • {grade.courseHours}h</div>
-                            </td>
-                            <td className="px-4 py-4 text-center font-black text-slate-700">{grade.firstBimester ?? "-"}</td>
-                            <td className="px-4 py-4 text-center font-black text-slate-700">{grade.secondBimester ?? "-"}</td>
-                            <td className="px-4 py-4 text-center font-black text-slate-700">{grade.thirdBimester ?? "-"}</td>
-                            <td className="px-4 py-4 text-center font-black text-slate-700">{grade.fourthBimester ?? "-"}</td>
-                            <td className={`px-4 py-4 text-center font-black text-lg ${getAverageColor(grade)}`}>
-                              {calculateAverage(grade)}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                grade.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                grade.status === 'reproved' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {grade.status === 'approved' ? 'Aprovado' :
-                                 grade.status === 'reproved' ? 'Reprovado' : 'Em Curso'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <CardContent className="grid grid-cols-2 gap-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                  <Button
+                    key={s}
+                    variant={selectedSemester === s ? "default" : "outline"}
+                    onClick={() => setSelectedSemester(s)}
+                    className={`h-12 font-bold ${selectedSemester === s ? "bg-slate-900" : ""}`}
+                  >
+                    {s}º
+                  </Button>
+                ))}
               </CardContent>
             </Card>
           </div>
-        )}
+
+          {/* Tabela de Notas */}
+          <div className="lg:col-span-3">
+            <Card className="border-none shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Disciplina</th>
+                      <th className="px-4 py-4 text-center text-xs font-bold text-slate-400 uppercase">1º Bim</th>
+                      <th className="px-4 py-4 text-center text-xs font-bold text-slate-400 uppercase">2º Bim</th>
+                      <th className="px-4 py-4 text-center text-xs font-bold text-slate-400 uppercase">3º Bim</th>
+                      <th className="px-4 py-4 text-center text-xs font-bold text-slate-400 uppercase">4º Bim</th>
+                      <th className="px-4 py-4 text-center text-xs font-bold text-slate-400 uppercase">Média</th>
+                      <th className="px-6 py-4 text-center text-xs font-bold text-slate-400 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {gradesQuery.isLoading ? (
+                      <tr>
+                        <td colSpan={7} className="py-20 text-center">
+                          <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mx-auto" />
+                        </td>
+                      </tr>
+                    ) : grades.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-20 text-center text-slate-400 italic">
+                          Nenhuma nota lançada para este semestre.
+                        </td>
+                      </tr>
+                    ) : (
+                      grades.map((grade: any) => (
+                        <tr key={grade.subjectId} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-900">{grade.subjectName}</p>
+                            <p className="text-xs text-slate-400">{grade.subjectCode}</p>
+                          </td>
+                          <td className="px-4 py-4 text-center font-medium text-slate-600">{grade.firstBimester || "-"}</td>
+                          <td className="px-4 py-4 text-center font-medium text-slate-600">{grade.secondBimester || "-"}</td>
+                          <td className="px-4 py-4 text-center font-medium text-slate-600">{grade.thirdBimester || "-"}</td>
+                          <td className="px-4 py-4 text-center font-medium text-slate-600">{grade.fourthBimester || "-"}</td>
+                          <td className="px-4 py-4 text-center font-bold text-slate-900">{calculateAverage(grade)}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(grade)}`}>
+                              {getStatusText(grade)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   );

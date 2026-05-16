@@ -45,7 +45,7 @@ export const dashboardRouter = router({
       const totalSubjects = await db
         .select({ count: count() })
         .from(subjects)
-        .innerJoin(courses, eq(subjects.courseId, courses.id));
+        .where(eq(subjects.status, "active"));
 
       // Contar matrículas ativas
       const totalEnrollments = await db

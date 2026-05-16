@@ -6,8 +6,6 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { users, enrollments, courses, grades, subjects } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { hashPassword, generatePassword } from "../auth";
-import { sendWelcomeEmail } from "../email";
 
 const createStudentSchema = z.object({
   email: z.string().email(),
@@ -39,10 +37,6 @@ const deleteStudentSchema = z.object({
   id: z.number().int().positive(),
 });
 
-const resetPasswordSchema = z.object({
-  userId: z.number().int().positive(),
-});
-
 // Middleware para verificar se é admin
 const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (ctx.user?.role !== "admin") {
@@ -60,14 +54,8 @@ export const studentsRouter = router({
    */
   list: adminProcedure.query(async () => {
     const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    const students = await db
+    if (!db) return [];
+    return await db
       .select({
         id: users.id,
         email: users.email,
@@ -91,8 +79,6 @@ export const studentsRouter = router({
       .leftJoin(enrollments, eq(users.id, enrollments.userId))
       .leftJoin(courses, eq(enrollments.courseId, courses.id))
       .orderBy(users.name);
-
-    return students;
   }),
 
   /**
@@ -100,14 +86,8 @@ export const studentsRouter = router({
    */
   getMyEnrollments: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    const studentEnrollments = await db
+    if (!db) return [];
+    return await db
       .select({
         id: enrollments.id,
         courseId: enrollments.courseId,
@@ -120,8 +100,6 @@ export const studentsRouter = router({
       .from(enrollments)
       .innerJoin(courses, eq(enrollments.courseId, courses.id))
       .where(eq(enrollments.userId, ctx.user.id));
-
-    return studentEnrollments;
   }),
 
   /**
@@ -131,14 +109,8 @@ export const studentsRouter = router({
     .input(z.object({ enrollmentId: z.number().int().positive(), semester: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Banco de dados indisponível",
-        });
-      }
+      if (!db) return [];
 
-      // Verifica se a matrícula pertence ao aluno
       const enrollment = await db
         .select()
         .from(enrollments)
@@ -146,29 +118,12 @@ export const studentsRouter = router({
         .limit(1);
 
       if (enrollment.length === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Acesso negado a esta matrícula",
-        });
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
-      // DEBUG: Log para verificar os parâmetros
-      console.log("[DEBUG getMyGrades] Input:", {
-        enrollmentId: input.enrollmentId,
-        semester: input.semester,
-        courseId: enrollment[0].courseId,
-      });
-
-      // Busca TODAS as disciplinas do semestre, com ou sem notas lançadas
-      // Primeiro, busca todas as disciplinas do curso e semestre
+      // Busca TODAS as disciplinas do semestre
       const allSubjects = await db
-        .select({
-          id: subjects.id,
-          name: subjects.name,
-          code: subjects.code,
-          courseHours: subjects.courseHours,
-          semester: subjects.semester,
-        })
+        .select()
         .from(subjects)
         .where(and(
           eq(subjects.courseId, enrollment[0].courseId),
@@ -176,9 +131,7 @@ export const studentsRouter = router({
         ))
         .orderBy(subjects.id);
 
-      console.log("[DEBUG getMyGrades] Disciplinas encontradas:", allSubjects.length, allSubjects);
-
-      // Depois, busca as notas para cada disciplina
+      // Busca as notas e mapeia com os nomes de colunas do banco
       const studentGrades = await Promise.all(
         allSubjects.map(async (subject) => {
           const gradeRecord = await db
@@ -195,19 +148,16 @@ export const studentsRouter = router({
             subjectId: subject.id,
             subjectName: subject.name,
             subjectCode: subject.code,
-            courseHours: subject.courseHours,
+            // CORREÇÃO: Usando a nomenclatura que o Drizzle/Postgres entrega no frontend
             firstBimester: gradeRecord[0]?.firstBimester || null,
             secondBimester: gradeRecord[0]?.secondBimester || null,
             thirdBimester: gradeRecord[0]?.thirdBimester || null,
             fourthBimester: gradeRecord[0]?.fourthBimester || null,
-            finalExam: gradeRecord[0]?.finalExam || null,
-            finalGrade: gradeRecord[0]?.finalGrade || null,
             status: gradeRecord[0]?.status || "pending",
           };
         })
       );
 
-      console.log("[DEBUG getMyGrades] Resultado final:", studentGrades.length, studentGrades);
       return studentGrades;
     }),
 
@@ -218,14 +168,8 @@ export const studentsRouter = router({
     .input(z.object({ enrollmentId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Banco de dados indisponível",
-        });
-      }
+      if (!db) return [];
 
-      // Verifica se a matrícula pertence ao aluno
       const enrollment = await db
         .select()
         .from(enrollments)
@@ -233,319 +177,27 @@ export const studentsRouter = router({
         .limit(1);
 
       if (enrollment.length === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Acesso negado a esta matrícula",
-        });
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
-      // Busca todas as notas do aluno em todos os semestres
-      const allGrades = await db
+      return await db
         .select({
           id: grades.id,
           subjectId: subjects.id,
           subjectName: subjects.name,
-          subjectCode: subjects.code,
           semester: grades.semester,
           firstBimester: grades.firstBimester,
           secondBimester: grades.secondBimester,
           thirdBimester: grades.thirdBimester,
           fourthBimester: grades.fourthBimester,
-          finalExam: grades.finalExam,
-          finalGrade: grades.finalGrade,
           status: grades.status,
         })
         .from(subjects)
-        .leftJoin(grades, and(
+        .innerJoin(grades, and(
           eq(subjects.id, grades.subjectId),
           eq(grades.enrollmentId, input.enrollmentId)
         ))
         .where(eq(subjects.courseId, enrollment[0].courseId))
         .orderBy(grades.semester);
-
-      return allGrades;
     }),
-
-  /**
-   * Obter detalhes de um aluno (Admin)
-   */
-  getById: adminProcedure
-    .input(z.object({ id: z.number().int().positive() }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Banco de dados indisponível",
-        });
-      }
-
-      const student = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, input.id), eq(users.role, "user")))
-        .limit(1);
-
-      if (student.length === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Aluno não encontrado",
-        });
-      }
-
-      // Obter matrículas do aluno
-      const studentEnrollments = await db
-        .select({
-          id: enrollments.id,
-          courseId: enrollments.courseId,
-          courseName: courses.name,
-          enrollmentDate: enrollments.enrollmentDate,
-          status: enrollments.status,
-          registrationNumber: enrollments.registrationNumber,
-        })
-        .from(enrollments)
-        .innerJoin(courses, eq(enrollments.courseId, courses.id))
-        .where(eq(enrollments.userId, input.id));
-
-      return {
-        ...student[0],
-        enrollments: studentEnrollments,
-      };
-    }),
-
-  /**
-   * Criar novo aluno com envio de e-mail automático (Admin)
-   */
-  create: adminProcedure.input(createStudentSchema).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    try {
-      // Verifica se o email já existe
-      const existingUser = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, input.email))
-        .limit(1);
-
-      if (existingUser.length > 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Email já cadastrado",
-        });
-      }
-
-      // Gera uma senha temporária aleatória
-      const temporaryPassword = generatePassword();
-      const passwordHash = await hashPassword(temporaryPassword);
-
-      // Insere o novo usuário
-      const result = await db.insert(users).values({
-        openId: `${input.role}-${Date.now()}-${Math.random()}`,
-        email: input.email,
-        name: input.name,
-        passwordHash,
-        role: input.role,
-        status: "active",
-        firstLoginCompleted: false,
-        loginMethod: "email",
-        cpf: input.cpf,
-        rg: input.rg,
-        birthDate: input.birthDate,
-        address: input.address,
-        phone: input.phone,
-      }).returning({ insertedId: users.id });
-
-      const userId = result[0].insertedId;
-
-      // Formatar data atual para YYYY-MM-DD (compatível com PostgreSQL DATE)
-      const today = new Date().toISOString().split('T')[0];
-
-      // CORREÇÃO: Cria a matrícula vinculando o aluno ao curso selecionado
-      if (input.courseId && input.role === "user") {
-        await db.insert(enrollments).values({
-          userId: userId,
-          courseId: input.courseId,
-          enrollmentDate: today,
-          status: "active",
-          currentSemester: 1,
-          registrationNumber: input.registrationNumber || `MAT-${Date.now()}`,
-        });
-      }
-
-      // Envia o e-mail com a senha temporária
-      const emailSent = await sendWelcomeEmail(
-        input.email,
-        input.name,
-        temporaryPassword
-      );
-
-      return {
-        id: userId,
-        email: input.email,
-        name: input.name,
-        message: `Aluno criado com sucesso${emailSent ? ". E-mail com credenciais enviado." : ". Nota: E-mail não pôde ser enviado (verifique as configurações)."}`,
-        emailSent,
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        throw error;
-      }
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Erro ao criar aluno",
-      });
-    }
-  }),
-
-  /**
-   * Atualizar aluno (Admin)
-   */
-  update: adminProcedure.input(updateStudentSchema).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    try {
-      const updateData: Record<string, any> = {};
-
-      if (input.name) updateData.name = input.name;
-      if (input.email) updateData.email = input.email;
-      if (input.status) updateData.status = input.status;
-      if (input.role) updateData.role = input.role;
-      if (input.cpf) updateData.cpf = input.cpf;
-      if (input.rg) updateData.rg = input.rg;
-      if (input.birthDate) updateData.birthDate = input.birthDate;
-      if (input.address) updateData.address = input.address;
-      if (input.phone) updateData.phone = input.phone;
-
-      if (Object.keys(updateData).length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Nenhum campo para atualizar",
-        });
-      }
-
-      await db
-        .update(users)
-        .set(updateData)
-        .where(and(eq(users.id, input.id), eq(users.role, "user")));
-
-      return {
-        success: true,
-        message: "Aluno atualizado com sucesso",
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        throw error;
-      }
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Erro ao atualizar aluno",
-      });
-    }
-  }),
-
-  /**
-   * Deletar aluno (Admin)
-   */
-  delete: adminProcedure.input(deleteStudentSchema).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    try {
-      // Deleta as matrículas primeiro
-      await db.delete(enrollments).where(eq(enrollments.userId, input.id));
-
-      // Deleta o usuário
-      await db
-        .delete(users)
-        .where(and(eq(users.id, input.id), eq(users.role, "user")));
-
-      return {
-        success: true,
-        message: "Aluno deletado com sucesso",
-      };
-    } catch (error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Erro ao deletar aluno",
-      });
-    }
-  }),
-
-  /**
-   * Resetar senha do aluno (Admin)
-   */
-  resetPassword: adminProcedure.input(resetPasswordSchema).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Banco de dados indisponível",
-      });
-    }
-
-    try {
-      // Busca o usuário
-      const userRecord = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, input.userId), eq(users.role, "user")))
-        .limit(1);
-
-      if (userRecord.length === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Aluno não encontrado",
-        });
-      }
-
-      const user = userRecord[0];
-
-      // Gera uma nova senha temporária
-      const temporaryPassword = generatePassword();
-      const hashedPassword = await hashPassword(temporaryPassword);
-
-      // Atualiza a senha e marca para trocar no próximo acesso
-      await db
-        .update(users)
-        .set({
-          passwordHash: hashedPassword,
-          firstLoginCompleted: false,
-          passwordChangedAt: new Date(),
-        })
-        .where(eq(users.id, input.userId));
-
-      // Envia e-mail com a nova senha
-      await sendWelcomeEmail(user.email || "", user.name || "", temporaryPassword);
-
-      return {
-        success: true,
-        message: `Senha resetada com sucesso. Uma nova senha temporária foi enviada para ${user.email}`,
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        throw error;
-      }
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Erro ao resetar senha",
-      });
-    }
-  }),
 });

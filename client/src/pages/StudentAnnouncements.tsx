@@ -10,12 +10,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function StudentAnnouncements() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [selectedType, setSelectedType] = useState<string>("all");
 
   // Buscar avisos publicados
   const announcementsQuery = trpc.announcements.list.useQuery();
 
-  const announcements = announcementsQuery.data || [];
+  // Normalização para garantir que os dados do Postgres (totalmente minúsculos) funcionem
+  const announcements = (announcementsQuery.data || []).map((ann: any) => ({
+    id: ann.id,
+    title: ann.title,
+    content: ann.content,
+    type: ann.type || "general",
+    priority: ann.priority || "medium",
+    publishedAt: ann.publishedat || ann.createdat || new Date(),
+  }));
 
   // Agrupar avisos por tipo
   const announcementsByType = {
@@ -64,15 +71,17 @@ export default function StudentAnnouncements() {
   const renderAnnouncementCard = (announcement: any) => {
     const TypeIcon = typeIcons[announcement.type as keyof typeof typeIcons] || Bell;
     return (
-      <Card key={announcement.id} className={`border-2 ${typeColors[announcement.type]}`}>
-        <CardHeader>
+      <Card key={announcement.id} className={`border-2 ${typeColors[announcement.type as keyof typeof typeColors] || typeColors.general} shadow-sm`}>
+        <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1">
-              <TypeIcon className="w-5 h-5 mt-1 flex-shrink-0" />
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <TypeIcon className="w-5 h-5 text-slate-600" />
+              </div>
               <div className="flex-1">
-                <CardTitle className="text-lg">{announcement.title}</CardTitle>
-                <CardDescription className="mt-1">
-                  {new Date(announcement.publishedAt || announcement.createdAt).toLocaleDateString("pt-BR", {
+                <CardTitle className="text-lg font-bold">{announcement.title}</CardTitle>
+                <CardDescription className="mt-1 font-medium text-xs uppercase">
+                  {new Date(announcement.publishedAt).toLocaleDateString("pt-BR", {
                     weekday: "long",
                     year: "numeric",
                     month: "long",
@@ -81,82 +90,80 @@ export default function StudentAnnouncements() {
                 </CardDescription>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${priorityColors[announcement.priority]}`}>
-              {priorityLabels[announcement.priority]}
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${priorityColors[announcement.priority as keyof typeof priorityColors] || priorityColors.medium}`}>
+              {priorityLabels[announcement.priority as keyof typeof priorityLabels] || "Média"}
             </span>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-slate-700 whitespace-pre-wrap">{announcement.content}</p>
+          <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm">{announcement.content}</p>
         </CardContent>
       </Card>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Cabeçalho */}
-      <header className="bg-white border-b border-slate-200 shadow-sm">
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/student")}
-            className="gap-2 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Voltar
-          </Button>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-            <Bell className="w-8 h-8 text-yellow-500" />
-            Avisos e Comunicados
-          </h1>
-          <p className="text-slate-600 mt-2">Fique atualizado com os últimos avisos da instituição</p>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/student")}
+              className="rounded-full"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Bell className="w-6 h-6 text-orange-500" />
+                Avisos e Comunicados
+              </h1>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">IAB FAPEGMA</p>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {announcementsQuery.isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-12 h-12 text-yellow-500 animate-spin mb-4" />
-            <p className="text-slate-500 font-bold">Carregando avisos...</p>
+            <Loader2 className="w-12 h-12 text-orange-500 animate-spin mb-4" />
+            <p className="text-slate-500 font-black uppercase tracking-widest text-xs">Buscando avisos...</p>
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Avisos de Alta Prioridade */}
             {highPriorityAnnouncements.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
-                  <h2 className="text-2xl font-bold text-slate-900">Avisos Importantes</h2>
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Urgente</h2>
                 </div>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {highPriorityAnnouncements.map(renderAnnouncementCard)}
                 </div>
               </div>
             )}
 
-            {/* Abas por Tipo */}
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-8">
-                <TabsTrigger value="all">Todos</TabsTrigger>
-                <TabsTrigger value="general">Geral</TabsTrigger>
-                <TabsTrigger value="academic">Acadêmico</TabsTrigger>
-                <TabsTrigger value="financial">Financeiro</TabsTrigger>
-                <TabsTrigger value="administrative">Administrativo</TabsTrigger>
+              <TabsList className="bg-white border border-slate-200 p-1 rounded-2xl mb-8 flex overflow-x-auto">
+                <TabsTrigger value="all" className="rounded-xl font-bold px-6">Todos</TabsTrigger>
+                <TabsTrigger value="general" className="rounded-xl font-bold px-6">Geral</TabsTrigger>
+                <TabsTrigger value="academic" className="rounded-xl font-bold px-6">Acadêmico</TabsTrigger>
+                <TabsTrigger value="financial" className="rounded-xl font-bold px-6">Financeiro</TabsTrigger>
+                <TabsTrigger value="administrative" className="rounded-xl font-bold px-6">Administrativo</TabsTrigger>
               </TabsList>
 
               <TabsContent value="all" className="space-y-4">
                 {announcements.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-20">
-                      <Bell className="w-16 h-16 text-slate-200 mb-4" />
-                      <h3 className="text-xl font-bold text-slate-900">Nenhum aviso no momento</h3>
-                      <p className="text-slate-500">Volte mais tarde para verificar novos avisos.</p>
-                    </CardContent>
-                  </Card>
+                  <div className="bg-white rounded-3xl p-20 text-center border border-dashed border-slate-200">
+                    <Bell className="w-16 h-16 text-slate-100 mx-auto mb-4" />
+                    <h3 className="text-xl font-black text-slate-900">Nenhum aviso</h3>
+                    <p className="text-slate-400 font-medium text-sm">Você está atualizado com todos os comunicados.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {announcements.map(renderAnnouncementCard)}
                   </div>
                 )}
@@ -165,15 +172,12 @@ export default function StudentAnnouncements() {
               {Object.entries(announcementsByType).map(([type, items]) => (
                 <TabsContent key={type} value={type} className="space-y-4">
                   {items.length === 0 ? (
-                    <Card>
-                      <CardContent className="flex flex-col items-center justify-center py-20">
-                        <Bell className="w-16 h-16 text-slate-200 mb-4" />
-                        <h3 className="text-xl font-bold text-slate-900">Nenhum aviso {typeLabels[type as keyof typeof typeLabels].toLowerCase()}</h3>
-                        <p className="text-slate-500">Não há avisos deste tipo no momento.</p>
-                      </CardContent>
-                    </Card>
+                    <div className="bg-white rounded-3xl p-20 text-center border border-dashed border-slate-200">
+                      <Bell className="w-16 h-16 text-slate-100 mx-auto mb-4" />
+                      <h3 className="text-xl font-black text-slate-900">Sem avisos nesta categoria</h3>
+                    </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {items.map(renderAnnouncementCard)}
                     </div>
                   )}

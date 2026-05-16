@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "./pages/NotFound";
+import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -12,7 +12,6 @@ import StudentSecretaria from "./pages/StudentSecretaria";
 import StudentAcademic from "./pages/StudentAcademic";
 import StudentAnnouncements from "./pages/StudentAnnouncements";
 import StudentPayment from "./pages/StudentPayment";
-import StudentID from "./pages/StudentID";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherGrades from "./pages/TeacherGrades";
 import { ChangePasswordRequired } from "./pages/ChangePasswordRequired";
@@ -92,10 +91,6 @@ function Router() {
       <Route
         path={"/student/pagamento"}
         component={() => <ProtectedRoute component={StudentPayment} requiredRole="user" />}
-      />
-      <Route
-        path={"/student/carteirinha"}
-        component={() => <ProtectedRoute component={StudentID} requiredRole="user" />}
       />
       
       {/* Rotas do Admin */}

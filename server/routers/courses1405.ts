@@ -6,12 +6,14 @@ import { eq, and, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 export const coursesRouter = router({
+  // LISTAR CURSOS: Essencial para que apareçam na tela após criar
   list: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
     return await db.select().from(courses).where(eq(courses.status, "active")).orderBy(asc(courses.name));
   }),
 
+  // CRIAR CURSO
   create: publicProcedure
     .input(z.object({ 
       name: z.string().min(3), 
@@ -28,11 +30,11 @@ export const coursesRouter = router({
       }).returning();
     }),
 
+  // LISTAR DISCIPLINAS: Para listar dentro de cada curso/semestre
   listSubjects: publicProcedure
     .input(z.object({ courseId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      // GARANTIA SUPER PROGRAMADOR: Selecionamos explicitamente os campos para garantir que o semestre venha preenchido
       return await db.select().from(subjects).where(
         and(
           eq(subjects.courseId, input.courseId),
@@ -41,6 +43,7 @@ export const coursesRouter = router({
       ).orderBy(asc(subjects.semester), asc(subjects.name));
     }),
 
+  // CRIAR DISCIPLINA
   createSubject: publicProcedure
     .input(z.object({
       name: z.string().min(3),
@@ -61,6 +64,7 @@ export const coursesRouter = router({
       }).returning();
     }),
 
+  // DELETAR CURSO: Limpeza completa
   delete: publicProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
@@ -75,6 +79,7 @@ export const coursesRouter = router({
       return { success: true };
     }),
 
+  // LISTAR ALUNOS: Para a aba de notas
   listStudentsByCourse: publicProcedure
     .input(z.object({ courseId: z.number() }))
     .query(async ({ input }) => {

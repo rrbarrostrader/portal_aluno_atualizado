@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { LogOut, BookOpen, FileText, BarChart3, Bell, CreditCard, Loader2, TrendingUp, Contact2 } from "lucide-react";
+import { LogOut, BookOpen, FileText, BarChart3, Bell, CreditCard, Loader2, TrendingUp, Contact2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
@@ -20,10 +20,9 @@ export default function StudentDashboard() {
   // Buscar matrículas do aluno
   const enrollmentsQuery = trpc.students.getMyEnrollments.useQuery();
 
-  // Buscar avisos recentes
+  // Buscar avisos recentes (Públicos)
   const announcementsQuery = trpc.announcements.list.useQuery();
 
-  // Buscar todas as notas do aluno para calcular estatísticas
   const [selectedEnrollment, setSelectedEnrollment] = useState<number | null>(null);
   
   useEffect(() => {
@@ -32,52 +31,10 @@ export default function StudentDashboard() {
     }
   }, [enrollmentsQuery.data, selectedEnrollment]);
 
-  // Query para buscar todas as notas do aluno
   const allGradesQuery = trpc.students.getAllMyGrades.useQuery(
     { enrollmentId: selectedEnrollment || 0 },
     { enabled: !!selectedEnrollment }
   );
-
-  // Calcular estatísticas acadêmicas
-  useEffect(() => {
-    if (allGradesQuery.data && Array.isArray(allGradesQuery.data)) {
-      const grades = allGradesQuery.data;
-      
-      // Calcular média geral
-      let totalAverage = 0;
-      let validGradeCount = 0;
-      const semesters = new Set<number>();
-      let approvedCount = 0;
-
-      grades.forEach((grade: any) => {
-        semesters.add(grade.semester);
-        
-        const bimesterGrades = [
-          grade.firstBimester,
-          grade.secondBimester,
-          grade.thirdBimester,
-          grade.fourthBimester,
-        ].filter((g) => g !== null && g !== undefined && Number(g) > 0);
-
-        if (bimesterGrades.length > 0) {
-          const avg = bimesterGrades.reduce((a: any, b: any) => Number(a) + Number(b), 0) / bimesterGrades.length;
-          totalAverage += avg;
-          validGradeCount++;
-
-          if (avg >= 7) {
-            approvedCount++;
-          }
-        }
-      });
-
-      setAcademicStats({
-        generalAverage: validGradeCount > 0 ? totalAverage / validGradeCount : 0,
-        activeSubjects: grades.length,
-        totalSemesters: semesters.size,
-        approvedSubjects: approvedCount
-      });
-    }
-  }, [allGradesQuery.data]);
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -86,260 +43,179 @@ export default function StudentDashboard() {
     },
   });
 
-  const handleLogout = () => {
-    logoutMutation.mutate();
-  };
+  useEffect(() => {
+    if (allGradesQuery.data && Array.isArray(allGradesQuery.data)) {
+      const grades = allGradesQuery.data;
+      let totalAverage = 0;
+      let validGradeCount = 0;
+      const semesters = new Set<number>();
+      let approvedCount = 0;
 
-  // Pegar apenas os 3 avisos mais recentes
+      grades.forEach((grade: any) => {
+        semesters.add(grade.semester);
+        const bimesterGrades = [
+          grade.firstBimester,
+          grade.secondBimester,
+          grade.thirdBimester,
+          grade.fourthBimester,
+        ].filter((g) => g !== null && g !== undefined && !isNaN(parseFloat(g)));
+
+        if (bimesterGrades.length > 0) {
+          const avg = bimesterGrades.reduce((a: any, b: any) => parseFloat(a) + parseFloat(b), 0) / bimesterGrades.length;
+          totalAverage += avg;
+          validGradeCount++;
+          if (avg >= 7) approvedCount++;
+        }
+      });
+
+      setAcademicStats({
+        generalAverage: validGradeCount > 0 ? totalAverage / validGradeCount : 0,
+        activeSubjects: grades.length,
+        totalSemesters: semesters.size || 1,
+        approvedSubjects: approvedCount
+      });
+    }
+  }, [allGradesQuery.data]);
+
   const recentAnnouncements = (announcementsQuery.data || []).slice(0, 3);
 
-  // Função para retornar cor baseada no tipo de aviso
   const getAnnouncementColor = (type: string) => {
     switch (type) {
-      case "academic":
-        return "bg-blue-50 border-blue-200 text-blue-900 text-blue-700";
-      case "financial":
-        return "bg-red-50 border-red-200 text-red-900 text-red-700";
-      case "administrative":
-        return "bg-purple-50 border-purple-200 text-purple-900 text-purple-700";
-      default:
-        return "bg-green-50 border-green-200 text-green-900 text-green-700";
+      case "academic": return "bg-blue-50 border-blue-200 text-blue-700";
+      case "financial": return "bg-red-50 border-red-200 text-red-700";
+      case "administrative": return "bg-purple-50 border-purple-200 text-purple-700";
+      default: return "bg-green-50 border-green-200 text-green-700";
     }
-  };
-
-  const getAnnouncementTypeLabel = (type: string) => {
-    switch (type) {
-      case "academic":
-        return "Acadêmico";
-      case "financial":
-        return "Financeiro";
-      case "administrative":
-        return "Administrativo";
-      default:
-        return "Geral";
-    }
-  };
-
-  // Função para determinar cor da média
-  const getAverageColor = (average: number) => {
-    if (average >= 7) return "text-green-600";
-    if (average >= 5) return "text-yellow-600";
-    return "text-red-600";
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Cabeçalho */}
-      <header className="bg-white border-b border-slate-200 shadow-sm">
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-              <span className="font-bold text-slate-900">IAB</span>
+            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
+              <span className="font-black text-yellow-400 text-xl">IAB</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Portal Acadêmico</h1>
-              <p className="text-sm text-slate-500">IAB FAPEGMA</p>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">Portal do Aluno</h1>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">IAB FAPEGMA</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium text-slate-900">{user?.name}</p>
-              <p className="text-xs text-slate-500">{user?.email}</p>
+            <div className="hidden md:block text-right mr-2">
+              <p className="text-sm font-bold text-slate-900">{user?.name}</p>
+              <p className="text-xs font-medium text-slate-400">{user?.email}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="gap-2"
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => logoutMutation.mutate()} 
+              className="rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
             >
-              <LogOut className="w-4 h-4" />
-              Sair
+              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Boas-vindas */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-900">Bem-vindo, {user?.name}!</h2>
-          <p className="text-slate-600 mt-2">Acesse seus dados acadêmicos abaixo</p>
+        <div className="bg-slate-900 rounded-3xl p-8 mb-8 text-white relative overflow-hidden shadow-2xl shadow-slate-200">
+          <div className="relative z-10">
+            <h2 className="text-3xl font-black mb-2">Olá, {user?.name?.split(' ')[0]}! 👋</h2>
+            <p className="text-slate-400 font-medium">Seu progresso acadêmico está excelente. Continue assim!</p>
+          </div>
+          <div className="absolute right-0 top-0 w-64 h-64 bg-yellow-400/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
         </div>
 
-        {/* Cards de Atalhos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setLocation("/student/boletim")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-yellow-500" />
-                Boletim
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Visualize suas notas e frequência</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setLocation("/student/academico")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-blue-500" />
-                Acadêmico
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Grade e histórico de disciplinas</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setLocation("/student/secretaria")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-green-500" />
-                Secretaria
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Gere documentos acadêmicos</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setLocation("/student/avisos")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Bell className="w-5 h-5 text-yellow-500" />
-                Avisos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Fique atualizado com avisos</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setLocation("/student/pagamento")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-purple-500" />
-                Pagamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Gerencie suas mensalidades</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="hover:shadow-lg transition-shadow cursor-pointer border-blue-100 bg-blue-50/30"
-            onClick={() => setLocation("/student/carteirinha")}
-          >
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Contact2 className="w-5 h-5 text-blue-600" />
-                Carteirinha
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">Sua identificação estudantil digital</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          {[
+            { icon: BarChart3, label: "Boletim", color: "text-yellow-500", path: "/student/boletim" },
+            { icon: BookOpen, label: "Acadêmico", color: "text-blue-500", path: "/student/academico" },
+            { icon: FileText, label: "Secretaria", color: "text-green-500", path: "/student/secretaria" },
+            { icon: Bell, label: "Avisos", color: "text-orange-500", path: "/student/avisos" },
+            { icon: CreditCard, label: "Financeiro", color: "text-purple-500", path: "/student/pagamento" },
+            { icon: Contact2, label: "ID Digital", color: "text-indigo-500", path: "/student/carteirinha" },
+          ].map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => setLocation(item.path)}
+              className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col items-center gap-3 group"
+            >
+              <div className={`p-3 rounded-2xl bg-slate-50 group-hover:bg-white transition-colors`}>
+                <item.icon className={`w-6 h-6 ${item.color}`} />
+              </div>
+              <span className="font-bold text-slate-700 text-sm">{item.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Seção de Informações */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Resumo Acadêmico */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-yellow-500" />
-                Resumo Acadêmico
-              </CardTitle>
-              <CardDescription>Informações do seu desempenho</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {allGradesQuery.isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-                    <span className="text-slate-700 font-semibold">Média Geral</span>
-                    <span className={`text-3xl font-bold ${getAverageColor(academicStats.generalAverage)}`}>
-                      {academicStats.generalAverage.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <span className="text-slate-600">Disciplinas Ativas</span>
-                    <span className="text-2xl font-bold text-slate-900">{academicStats.activeSubjects}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <span className="text-slate-600">Semestres Cursados</span>
-                    <span className="text-2xl font-bold text-slate-900">{academicStats.totalSemesters}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-green-700 font-semibold">Disciplinas Aprovadas</span>
-                    <span className="text-2xl font-bold text-green-600">{academicStats.approvedSubjects}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-none shadow-sm bg-white rounded-3xl">
+                <CardContent className="pt-6">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Média Geral</p>
+                  <h3 className="text-4xl font-black text-slate-900">{academicStats.generalAverage.toFixed(1)}</h3>
+                </CardContent>
+              </Card>
+              <Card className="border-none shadow-sm bg-white rounded-3xl">
+                <CardContent className="pt-6">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Disciplinas</p>
+                  <h3 className="text-4xl font-black text-slate-900">{academicStats.activeSubjects}</h3>
+                </CardContent>
+              </Card>
+              <Card className="border-none shadow-sm bg-white rounded-3xl">
+                <CardContent className="pt-6">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Aprovadas</p>
+                  <h3 className="text-4xl font-black text-green-600">{academicStats.approvedSubjects}</h3>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Avisos Recentes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Avisos Recentes</CardTitle>
-              <CardDescription>Últimas notificações</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {announcementsQuery.isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />
-                </div>
-              ) : recentAnnouncements.length > 0 ? (
-                <div className="space-y-3">
-                  {recentAnnouncements.map((announcement) => {
-                    const colors = getAnnouncementColor(announcement.type);
-                    const [bgColor, borderColor, textColor, textColorSecondary] = colors.split(" ");
-                    
-                    return (
-                      <div key={announcement.id} className={`p-3 ${bgColor} border ${borderColor} rounded-lg`}>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className={`text-sm font-medium ${textColor}`}>{announcement.title}</p>
-                            <p className={`text-xs ${textColorSecondary} mt-1 line-clamp-2`}>{announcement.content}</p>
-                          </div>
-                          {announcement.priority === "high" && (
-                            <span className="ml-2 px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded">!</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-slate-400 text-sm italic">Nenhum aviso no momento</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
+              <CardHeader className="bg-white border-b border-slate-50">
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                  Próximas Atividades
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 text-center text-slate-400 italic">
+                Nenhuma atividade agendada para esta semana.
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
+              <CardHeader className="bg-white border-b border-slate-50">
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-orange-500" />
+                  Últimos Avisos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {announcementsQuery.isLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-slate-200" /></div>
+                ) : recentAnnouncements.length === 0 ? (
+                  <p className="text-center text-sm text-slate-400 py-8">Nenhum aviso no momento.</p>
+                ) : (
+                  recentAnnouncements.map((ann) => (
+                    <div key={ann.id} className={`p-4 rounded-2xl border ${getAnnouncementColor(ann.type)} transition-transform hover:scale-[1.02] cursor-pointer`}>
+                      <h4 className="font-black text-sm mb-1">{ann.title}</h4>
+                      <p className="text-xs line-clamp-2 opacity-80">{ann.content}</p>
+                    </div>
+                  ))
+                )}
+                <Button 
+                  variant="ghost" 
+                  className="w-full text-slate-500 font-bold text-xs uppercase tracking-widest" 
+                  onClick={() => setLocation("/student/avisos")}
+                >
+                  Ver todos os avisos
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
     </div>

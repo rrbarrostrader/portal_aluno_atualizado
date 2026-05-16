@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { LogOut, Users, BookOpen, BarChart3, Settings, GraduationCap, School, Loader2, Bell, DollarSign, FileText, Calculator } from "lucide-react";
+import { LogOut, Users, BookOpen, BarChart3, Settings, GraduationCap, School, Loader2, Bell, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import AdminStudents from "./AdminStudents";
@@ -12,7 +12,6 @@ import AdminCourses from "./AdminCourses";
 import AdminSettings from "./AdminSettings";
 import AdminAnnouncements from "./AdminAnnouncements";
 import AdminPayments from "./AdminPayments";
-import AdminGradesReport from "./AdminGradesReport";
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -98,22 +97,9 @@ export default function AdminDashboard() {
                   : "text-slate-700 hover:bg-slate-100"
               }`}
             >
-              <Calculator className="w-4 h-4" />
-              Lançar Notas
+              <BarChart3 className="w-4 h-4" />
+              Notas
             </button>
-
-            <button
-              onClick={() => setActiveTab("grades_report")}
-              className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                activeTab === "grades_report"
-                  ? "bg-yellow-100 text-yellow-900 font-medium"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Relatório de Notas
-            </button>
-
             <button
               onClick={() => setActiveTab("courses")}
               className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
@@ -278,9 +264,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {activeTab === "grades" && <AdminGrades />}
 
-          {activeTab === "grades_report" && <AdminGradesReport />}
+
+          {activeTab === "grades" && <AdminGrades />}
 
           {activeTab === "courses" && <AdminCourses />}
 

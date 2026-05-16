@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { grades } from "../../drizzle/schema";
-import { sql, eq, and } from "drizzle-orm";
+import { sql, eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 export const gradesRouter = router({
@@ -17,8 +17,21 @@ export const gradesRouter = router({
       return await db.select().from(grades).where(
         and(
           eq(grades.subjectId, input.subjectId),
-          sql`${grades.enrollmentId} IN ${input.enrollmentIds}`
+          inArray(grades.enrollmentId, input.enrollmentIds)
         )
+      );
+    }),
+
+  // NOVA QUERY: Busca todas as notas de múltiplos alunos para todas as disciplinas
+  getAllCourseGrades: publicProcedure
+    .input(z.object({
+      enrollmentIds: z.array(z.number())
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db || input.enrollmentIds.length === 0) return [];
+      return await db.select().from(grades).where(
+        inArray(grades.enrollmentId, input.enrollmentIds)
       );
     }),
 
@@ -26,7 +39,7 @@ export const gradesRouter = router({
     .input(z.object({
       enrollmentId: z.number(),
       subjectId: z.number(),
-      semester: z.number(), // Validação rigorosa de número
+      semester: z.number(),
       firstBimester: z.number().nullable(),
       secondBimester: z.number().nullable(),
       thirdBimester: z.number().nullable(),
@@ -36,34 +49,36 @@ export const gradesRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       
+      console.log("Executando gravação de nota no banco real:", input);
+
       const query = sql`
         INSERT INTO grades (
-          enrollment_id, subject_id, semester, 
-          first_bimester, second_bimester, third_bimester, fourth_bimester, final_grade,
-          updated_at
+          enrollmentid, subjectid, semester, 
+          firstbimester, secondbimester, thirdbimester, fourthbimester,
+          updatedat
         ) 
         VALUES (
           ${input.enrollmentId}, ${input.subjectId}, ${input.semester},
-          ${input.firstBimester}, ${input.secondBimester}, ${input.thirdBimester}, ${input.fourthBimester}, ${input.finalGrade},
+          ${input.firstBimester}, ${input.secondBimester}, ${input.thirdBimester}, ${input.fourthBimester},
           NOW()
         )
-        ON CONFLICT (enrollment_id, subject_id, semester) 
+        ON CONFLICT (enrollmentid, subjectid, semester) 
         DO UPDATE SET 
-          first_bimester = EXCLUDED.first_bimester,
-          second_bimester = EXCLUDED.second_bimester,
-          third_bimester = EXCLUDED.third_bimester,
-          fourth_bimester = EXCLUDED.fourth_bimester,
-          final_grade = EXCLUDED.final_grade,
-          updated_at = NOW()
+          firstbimester = EXCLUDED.firstbimester,
+          secondbimester = EXCLUDED.secondbimester,
+          thirdbimester = EXCLUDED.thirdbimester,
+          fourthbimester = EXCLUDED.fourthbimester,
+          updatedat = NOW()
       `;
 
       try {
-        return await db.execute(query);
-      } catch (e) {
-        console.error("ERRO CRÍTICO NO BANCO:", e);
+        const result = await db.execute(query);
+        return result;
+      } catch (e: any) {
+        console.error("ERRO NO BANCO:", e);
         throw new TRPCError({ 
           code: "INTERNAL_SERVER_ERROR", 
-          message: "Falha ao gravar no banco. Verifique se o semestre está cadastrado na disciplina." 
+          message: `Erro do Postgres: ${e.message}`
         });
       }
     }),
