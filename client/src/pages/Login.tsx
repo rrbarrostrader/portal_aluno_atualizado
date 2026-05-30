@@ -110,7 +110,15 @@ export default function Login() {
               </Button>
             </form>
 
-            
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <p className="text-sm text-slate-400 text-center">
+                Credenciais padrão para admin:
+                <br />
+                <span className="text-slate-300 font-mono">admin@iabfapgema.com.br</span>
+                <br />
+                <span className="text-slate-300 font-mono">IAB_@2026_START</span>
+              </p>
+            </div>
           </CardContent>
         </Card>
 
