@@ -40,6 +40,7 @@ export default function AdminGradesReport() {
 
   const handleEdit = (enrollmentId: number, subjectId: number, currentGrades: any) => {
     setEditingGrade({ enrollmentId, subjectId });
+    // CORREÇÃO: Usando camelCase conforme o JSON real
     setTempGrades({
       f: currentGrades?.firstBimester ?? "",
       s: currentGrades?.secondBimester ?? "",
@@ -60,13 +61,6 @@ export default function AdminGradesReport() {
       finalGrade: null
     });
   };
-
-  const gradeLabels = [
-    { label: 'Atividade', short: 'Ativ' },
-    { label: 'Avaliação', short: 'Aval' },
-    { label: 'Frequência', short: 'Freq' },
-    { label: 'Substitutiva', short: 'Subs' }
-  ];
 
   return (
     <div className="space-y-6">
@@ -125,15 +119,17 @@ export default function AdminGradesReport() {
                       <TableHeader>
                         <TableRow className="bg-slate-100/50 hover:bg-slate-100/50">
                           <TableHead className="font-bold text-slate-700">Disciplina</TableHead>
-                          {gradeLabels.map((item, idx) => (
-                            <TableHead key={idx} className="text-center font-bold text-slate-700">{item.short}</TableHead>
-                          ))}
+                          <TableHead className="text-center font-bold text-slate-700">1º Bim</TableHead>
+                          <TableHead className="text-center font-bold text-slate-700">2º Bim</TableHead>
+                          <TableHead className="text-center font-bold text-slate-700">3º Bim</TableHead>
+                          <TableHead className="text-center font-bold text-slate-700">4º Bim</TableHead>
                           <TableHead className="text-center font-bold text-slate-700">Média</TableHead>
                           <TableHead className="text-right font-bold text-slate-700">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {subjects?.map(subject => {
+                          // CORREÇÃO: Usando camelCase e convertendo para número conforme o JSON real
                           const grade = allGrades?.find(g => Number(g.enrollmentId) === Number(student.enrollmentId) && Number(g.subjectId) === Number(subject.id));
                           const isEditing = editingGrade?.enrollmentId === student.enrollmentId && editingGrade?.subjectId === subject.id;
                           

@@ -5,7 +5,7 @@ import { protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { users, enrollments, courses, grades, subjects } from "../../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { hashPassword, generatePassword } from "../auth";
 import { sendWelcomeEmail } from "../email";
 
@@ -138,6 +138,7 @@ export const studentsRouter = router({
         });
       }
 
+      // 1. Verificar se a matrícula pertence ao aluno logado
       const enrollment = await db
         .select()
         .from(enrollments)
@@ -151,6 +152,7 @@ export const studentsRouter = router({
         });
       }
 
+      // 2. Buscar todas as disciplinas do curso para aquele semestre
       const allSubjects = await db
         .select({
           id: subjects.id,
@@ -165,10 +167,18 @@ export const studentsRouter = router({
         ))
         .orderBy(subjects.id);
 
+      // 3. Buscar as notas usando Drizzle tradicional para evitar erros de driver (como o execute[0])
       const studentGrades = await Promise.all(
         allSubjects.map(async (subject) => {
           const gradeRecord = await db
-            .select()
+            .select({
+              id: grades.id,
+              firstBimester: grades.firstBimester,
+              secondBimester: grades.secondBimester,
+              thirdBimester: grades.thirdBimester,
+              fourthBimester: grades.fourthBimester,
+              status: grades.status,
+            })
             .from(grades)
             .where(and(
               eq(grades.enrollmentId, input.enrollmentId),
@@ -177,15 +187,17 @@ export const studentsRouter = router({
             ))
             .limit(1);
 
+          const grade = gradeRecord[0];
+
           return {
             subjectId: subject.id,
             subjectName: subject.name,
             subjectCode: subject.code,
-            firstBimester: gradeRecord[0]?.firstBimester || null,
-            secondBimester: gradeRecord[0]?.secondBimester || null,
-            thirdBimester: gradeRecord[0]?.thirdBimester || null,
-            fourthBimester: gradeRecord[0]?.fourthBimester || null,
-            status: gradeRecord[0]?.status || "pending",
+            firstBimester: grade?.firstBimester || null,
+            secondBimester: grade?.secondBimester || null,
+            thirdBimester: grade?.thirdBimester || null,
+            fourthBimester: grade?.fourthBimester || null,
+            status: grade?.status || "pending",
           };
         })
       );
@@ -212,7 +224,7 @@ export const studentsRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
-      return await db
+      const allGrades = await db
         .select({
           id: grades.id,
           subjectId: subjects.id,
@@ -231,6 +243,8 @@ export const studentsRouter = router({
         ))
         .where(eq(subjects.courseId, enrollment[0].courseId))
         .orderBy(grades.semester);
+
+      return allGrades;
     }),
 
   /**
@@ -260,22 +274,6 @@ export const studentsRouter = router({
         });
       }
 
-      // Verifica se o CPF já existe (se fornecido)
-      if (input.cpf) {
-        const existingCpf = await db
-          .select()
-          .from(users)
-          .where(eq(users.cpf, input.cpf))
-          .limit(1);
-
-        if (existingCpf.length > 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "CPF já cadastrado no sistema",
-          });
-        }
-      }
-
       const temporaryPassword = generatePassword();
       const passwordHash = await hashPassword(temporaryPassword);
 
@@ -298,9 +296,7 @@ export const studentsRouter = router({
       const userId = result[0].insertedId;
       const today = new Date().toISOString().split('T')[0];
 
-      // Só cria matrícula se for Aluno (user) e tiver curso selecionado
       if (input.role === "user" && input.courseId) {
-        // Gerar RA formatado: MAT-TIMESTAMP (garante que nunca seja vazio)
         const generatedRA = `MAT-${Date.now().toString().slice(-8)}`;
         
         await db.insert(enrollments).values({
@@ -329,18 +325,9 @@ export const studentsRouter = router({
     } catch (error) {
       console.error("[ERROR students.create]", error);
       if (error instanceof TRPCError) throw error;
-      
-      const msg = error instanceof Error ? error.message : "Erro desconhecido";
-      if (msg.includes("unique constraint") && msg.includes("email")) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Este e-mail já está em uso." });
-      }
-      if (msg.includes("unique constraint") && msg.includes("cpf")) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Este CPF já está cadastrado." });
-      }
-      
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: `Erro ao criar usuário: ${msg}`,
+        message: `Erro ao criar usuário: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
       });
     }
   }),

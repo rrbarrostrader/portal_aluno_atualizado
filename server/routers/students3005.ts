@@ -156,6 +156,7 @@ export const studentsRouter = router({
           id: subjects.id,
           name: subjects.name,
           code: subjects.code,
+          courseHours: subjects.courseHours,
           semester: subjects.semester,
         })
         .from(subjects)
@@ -181,56 +182,19 @@ export const studentsRouter = router({
             subjectId: subject.id,
             subjectName: subject.name,
             subjectCode: subject.code,
+            courseHours: subject.courseHours,
             firstBimester: gradeRecord[0]?.firstBimester || null,
             secondBimester: gradeRecord[0]?.secondBimester || null,
             thirdBimester: gradeRecord[0]?.thirdBimester || null,
             fourthBimester: gradeRecord[0]?.fourthBimester || null,
+            finalExam: gradeRecord[0]?.finalExam || null,
+            finalGrade: gradeRecord[0]?.finalGrade || null,
             status: gradeRecord[0]?.status || "pending",
           };
         })
       );
 
       return studentGrades;
-    }),
-
-  /**
-   * Obter todas as notas do aluno (para cálculo de estatísticas)
-   */
-  getAllMyGrades: protectedProcedure
-    .input(z.object({ enrollmentId: z.number().int().positive() }))
-    .query(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) return [];
-
-      const enrollment = await db
-        .select()
-        .from(enrollments)
-        .where(and(eq(enrollments.id, input.enrollmentId), eq(enrollments.userId, ctx.user.id)))
-        .limit(1);
-
-      if (enrollment.length === 0) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
-
-      return await db
-        .select({
-          id: grades.id,
-          subjectId: subjects.id,
-          subjectName: subjects.name,
-          semester: grades.semester,
-          firstBimester: grades.firstBimester,
-          secondBimester: grades.secondBimester,
-          thirdBimester: grades.thirdBimester,
-          fourthBimester: grades.fourthBimester,
-          status: grades.status,
-        })
-        .from(subjects)
-        .innerJoin(grades, and(
-          eq(subjects.id, grades.subjectId),
-          eq(grades.enrollmentId, input.enrollmentId)
-        ))
-        .where(eq(subjects.courseId, enrollment[0].courseId))
-        .orderBy(grades.semester);
     }),
 
   /**
@@ -300,16 +264,13 @@ export const studentsRouter = router({
 
       // Só cria matrícula se for Aluno (user) e tiver curso selecionado
       if (input.role === "user" && input.courseId) {
-        // Gerar RA formatado: MAT-TIMESTAMP (garante que nunca seja vazio)
-        const generatedRA = `MAT-${Date.now().toString().slice(-8)}`;
-        
         await db.insert(enrollments).values({
           userId: userId,
           courseId: input.courseId,
           enrollmentDate: today,
           status: "active",
           currentSemester: 1,
-          registrationNumber: input.registrationNumber || generatedRA,
+          registrationNumber: input.registrationNumber || `RA${Date.now()}`,
         });
       }
 

@@ -21,6 +21,7 @@ export default function StudentID() {
   const uploadPhotoMutation = trpc.auth.updateProfileImage.useMutation({
     onSuccess: () => {
       toast.success("Foto de perfil atualizada!");
+      // Recarrega os dados do usuário para atualizar a foto na carteirinha
       if (typeof refetch === 'function') {
         refetch();
       } else {
@@ -39,6 +40,7 @@ export default function StudentID() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validação básica de tamanho (ex: 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("A imagem deve ter no máximo 5MB");
       return;
@@ -52,6 +54,10 @@ export default function StudentID() {
         contentType: file.type
       });
     };
+    reader.onerror = () => {
+      toast.error("Erro ao ler o arquivo");
+      setIsUploading(false);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -59,15 +65,9 @@ export default function StudentID() {
   const getImageUrl = (url: string | null | undefined) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    
-    // CORREÇÃO: No ambiente local, o backend costuma rodar na porta 3000
-    // mas o frontend (Vite) roda na 5173. Precisamos apontar para a porta do backend.
-    const backendUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3000' 
-      : `${window.location.protocol}//${window.location.host}`;
-    
-    const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    return `${backendUrl}${cleanPath}`;
+    // Se a URL começar com /, remove para não duplicar
+    const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+    return `${window.location.origin}/${cleanUrl}`;
   };
 
   const downloadPDF = async () => {
@@ -85,16 +85,6 @@ export default function StudentID() {
         allowTaint: false,
         backgroundColor: "#ffffff",
         logging: false,
-        onclone: (clonedDoc) => {
-          const allElements = clonedDoc.getElementsByTagName("*");
-          for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i] as HTMLElement;
-            const style = window.getComputedStyle(el);
-            if (style.color.includes("oklch")) el.style.color = "#1e293b";
-            if (style.backgroundColor.includes("oklch")) el.style.backgroundColor = "transparent";
-            if (style.borderColor.includes("oklch")) el.style.borderColor = "#e2e8f0";
-          }
-        }
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 0.95);

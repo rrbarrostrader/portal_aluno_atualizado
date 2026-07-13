@@ -94,13 +94,6 @@ export default function TeacherGrades() {
     });
   };
 
-  const gradeLabels = [
-    { id: 'f', label: 'Atividade' },
-    { id: 's', label: 'Avaliação' },
-    { id: 't', label: 'Frequência' },
-    { id: 'fo', label: 'Substitutiva' }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Cabeçalho */}
@@ -197,20 +190,16 @@ export default function TeacherGrades() {
                   {isExpanded && (
                     <div className="p-8 bg-slate-50 border-t border-slate-100 animate-in slide-in-from-top-4">
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                        {gradeLabels.map((item, idx) => {
-                          const bNum = idx + 1;
-                          const dbField = bNum === 1 ? 'firstBimester' : bNum === 2 ? 'secondBimester' : bNum === 3 ? 'thirdBimester' : 'fourthBimester';
-                          return (
-                            <div key={item.id} className="space-y-2">
-                              <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{item.label}</label>
-                              <Input 
-                                type="number" step="0.1" placeholder="0.0" className="bg-white h-12 text-center text-lg font-bold border-slate-200 focus:border-blue-400"
-                                defaultValue={dbData?.[dbField] ?? ""}
-                                onChange={e => setLocalGrades({...localGrades, [student.enrollmentId]: {...localGrades[student.enrollmentId], [item.id]: Number(e.target.value)}})}
-                              />
-                            </div>
-                          );
-                        })}
+                        {[1, 2, 3, 4].map(b => (
+                          <div key={b} className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{b}º Bimestre</label>
+                            <Input 
+                              type="number" step="0.1" placeholder="0.0" className="bg-white h-12 text-center text-lg font-bold border-slate-200 focus:border-blue-400"
+                              defaultValue={dbData?.[b === 1 ? 'firstBimester' : b === 2 ? 'secondBimester' : b === 3 ? 'thirdBimester' : 'fourthBimester'] ?? ""}
+                              onChange={e => setLocalGrades({...localGrades, [student.enrollmentId]: {...localGrades[student.enrollmentId], [b === 1 ? 'f' : b === 2 ? 's' : b === 3 ? 't' : 'fo']: Number(e.target.value)}})}
+                            />
+                          </div>
+                        ))}
                         <div className="flex items-end">
                           <Button className="w-full h-12 bg-blue-700 hover:bg-blue-800 font-black shadow-lg" onClick={() => handleSave(student.enrollmentId)} disabled={saveMutation.isPending}>
                             {saveMutation.isPending ? <Loader2 className="animate-spin" /> : <><Save className="w-5 h-5 mr-2" /> SALVAR</>}
@@ -223,7 +212,7 @@ export default function TeacherGrades() {
                           {avg >= 7 ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
                           <span className="text-sm font-bold uppercase tracking-tight">Status Atual: {avg >= 7 ? 'Aprovado' : 'Abaixo da Média'}</span>
                         </div>
-                        <span className="text-xs font-medium opacity-70">Cálculo automático baseado na média aritmética das avaliações.</span>
+                        <span className="text-xs font-medium opacity-70">Cálculo automático baseado na média aritmética dos 4 bimestres.</span>
                       </div>
                     </div>
                   )}

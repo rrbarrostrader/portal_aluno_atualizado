@@ -46,11 +46,10 @@ export default function StudentGrades() {
   const calculateAverage = (gradeItem: any): string => {
     if (!gradeItem) return "-";
 
-    // O backend pode retornar como firstBimester ou first_bimester dependendo da query
-    const bim1 = gradeItem.firstBimester || gradeItem.first_bimester ? parseFloat(gradeItem.firstBimester || gradeItem.first_bimester) : null;
-    const bim2 = gradeItem.secondBimester || gradeItem.second_bimester ? parseFloat(gradeItem.secondBimester || gradeItem.second_bimester) : null;
-    const bim3 = gradeItem.thirdBimester || gradeItem.third_bimester ? parseFloat(gradeItem.thirdBimester || gradeItem.third_bimester) : null;
-    const bim4 = gradeItem.fourthBimester || gradeItem.fourth_bimester ? parseFloat(gradeItem.fourthBimester || gradeItem.fourth_bimester) : null;
+    const bim1 = gradeItem.firstBimester ? parseFloat(gradeItem.firstBimester) : null;
+    const bim2 = gradeItem.secondBimester ? parseFloat(gradeItem.secondBimester) : null;
+    const bim3 = gradeItem.thirdBimester ? parseFloat(gradeItem.thirdBimester) : null;
+    const bim4 = gradeItem.fourthBimester ? parseFloat(gradeItem.fourthBimester) : null;
 
     const validGrades = [bim1, bim2, bim3, bim4].filter((g): g is number => g !== null && !isNaN(g));
 
@@ -78,13 +77,6 @@ export default function StudentGrades() {
     return "Reprovado";
   };
 
-  const gradeLabels = [
-    { label: 'Atividade' },
-    { label: 'Avaliação' },
-    { label: 'Frequência' },
-    { label: 'Substitutiva' }
-  ];
-
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
@@ -95,7 +87,7 @@ export default function StudentGrades() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900">Minhas Notas</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900">Meu Boletim</h1>
                 <p className="text-xs md:text-sm text-slate-500 truncate max-w-[200px] md:max-w-none">
                   {currentEnrollment?.courseName || "Carregando..."}
                 </p>
@@ -154,9 +146,10 @@ export default function StudentGrades() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
                           <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Disciplina</th>
-                          {gradeLabels.map((item, idx) => (
-                            <th key={idx} className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</th>
-                          ))}
+                          <th className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">1º Bim</th>
+                          <th className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">2º Bim</th>
+                          <th className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">3º Bim</th>
+                          <th className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">4º Bim</th>
                           <th className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Média</th>
                           <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                         </tr>
@@ -165,13 +158,13 @@ export default function StudentGrades() {
                         {grades.map((grade: any) => (
                           <tr key={grade.subjectId} className="hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4">
-                              <p className="font-bold text-slate-900">{grade.subjectName || grade.subject_name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">{grade.subjectCode || grade.subject_code}</p>
+                              <p className="font-bold text-slate-900">{grade.subjectName}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">{grade.subjectCode}</p>
                             </td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.firstBimester || grade.first_bimester || "-"}</td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.secondBimester || grade.second_bimester || "-"}</td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.thirdBimester || grade.third_bimester || "-"}</td>
-                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.fourthBimester || grade.fourth_bimester || "-"}</td>
+                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.firstBimester || "-"}</td>
+                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.secondBimester || "-"}</td>
+                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.thirdBimester || "-"}</td>
+                            <td className="px-4 py-4 text-center font-bold text-slate-600">{grade.fourthBimester || "-"}</td>
                             <td className="px-4 py-4 text-center font-black text-slate-900">{calculateAverage(grade)}</td>
                             <td className="px-6 py-4 text-center">
                               <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight ${getStatusColor(grade)}`}>
@@ -191,8 +184,8 @@ export default function StudentGrades() {
                     <Card key={grade.subjectId} className="border-none shadow-sm rounded-2xl overflow-hidden">
                       <div className="p-4 bg-white border-b border-slate-50 flex justify-between items-start">
                         <div>
-                          <h4 className="font-black text-slate-900 text-sm leading-tight">{grade.subjectName || grade.subject_name}</h4>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{grade.subjectCode || grade.subject_code}</p>
+                          <h4 className="font-black text-slate-900 text-sm leading-tight">{grade.subjectName}</h4>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{grade.subjectCode}</p>
                         </div>
                         <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight ${getStatusColor(grade)}`}>
                           {getStatusText(grade)}
@@ -200,10 +193,10 @@ export default function StudentGrades() {
                       </div>
                       <div className="p-4 bg-slate-50/50 grid grid-cols-4 gap-2">
                         {[
-                          { label: "Ativ", val: grade.firstBimester || grade.first_bimester },
-                          { label: "Aval", val: grade.secondBimester || grade.second_bimester },
-                          { label: "Freq", val: grade.thirdBimester || grade.third_bimester },
-                          { label: "Subs", val: grade.fourthBimester || grade.fourth_bimester }
+                          { label: "1º B", val: grade.firstBimester },
+                          { label: "2º B", val: grade.secondBimester },
+                          { label: "3º B", val: grade.thirdBimester },
+                          { label: "4º B", val: grade.fourthBimester }
                         ].map((b, i) => (
                           <div key={i} className="text-center bg-white p-2 rounded-xl border border-slate-100">
                             <p className="text-[8px] font-black text-slate-400 uppercase mb-1">{b.label}</p>

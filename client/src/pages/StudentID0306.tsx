@@ -21,15 +21,11 @@ export default function StudentID() {
   const uploadPhotoMutation = trpc.auth.updateProfileImage.useMutation({
     onSuccess: () => {
       toast.success("Foto de perfil atualizada!");
-      if (typeof refetch === 'function') {
-        refetch();
-      } else {
-        window.location.reload();
-      }
+      if (typeof refetch === 'function') refetch();
+      else window.location.reload();
       setIsUploading(false);
     },
     onError: (error) => {
-      console.error("Erro no upload:", error);
       toast.error(error.message || "Erro ao fazer upload da foto");
       setIsUploading(false);
     }
@@ -38,12 +34,6 @@ export default function StudentID() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("A imagem deve ter no máximo 5MB");
-      return;
-    }
-
     setIsUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -55,19 +45,10 @@ export default function StudentID() {
     reader.readAsDataURL(file);
   };
 
-  // Função para garantir que a URL da imagem esteja correta
   const getImageUrl = (url: string | null | undefined) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    
-    // CORREÇÃO: No ambiente local, o backend costuma rodar na porta 3000
-    // mas o frontend (Vite) roda na 5173. Precisamos apontar para a porta do backend.
-    const backendUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3000' 
-      : `${window.location.protocol}//${window.location.host}`;
-    
-    const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    return `${backendUrl}${cleanPath}`;
+    return `http://localhost:3000${url}`;
   };
 
   const downloadPDF = async () => {
@@ -82,10 +63,11 @@ export default function StudentID() {
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        allowTaint: false,
+        allowTaint: false, // Alterado para false para evitar problemas de segurança com CORS
         backgroundColor: "#ffffff",
         logging: false,
         onclone: (clonedDoc) => {
+          // NORMALIZAÇÃO AGRESSIVA: Removemos qualquer menção a oklch do documento clonado
           const allElements = clonedDoc.getElementsByTagName("*");
           for (let i = 0; i < allElements.length; i++) {
             const el = allElements[i] as HTMLElement;
@@ -159,24 +141,17 @@ export default function StudentID() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{ width: '128px', height: '128px', borderRadius: '16px', backgroundColor: '#e2e8f0', border: '4px solid #ffffff', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {isUploading ? (
-                <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-              ) : profilePhoto ? (
+              {profilePhoto ? (
                 <img src={profilePhoto} style={{ width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" />
               ) : (
                 <Camera style={{ width: '40px', height: '40px', color: '#94a3b8' }} />
               )}
             </div>
-            <button 
-              onClick={() => fileInputRef.current?.click()} 
-              disabled={isUploading}
-              style={{ position: 'absolute', bottom: '-8px', right: '-8px', backgroundColor: '#003366', color: '#ffffff', padding: '8px', borderRadius: '12px', border: 'none', cursor: 'pointer' }}
-            >
+            <button onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', bottom: '-8px', right: '-8px', backgroundColor: '#003366', color: '#ffffff', padding: '8px', borderRadius: '12px', border: 'none', cursor: 'pointer' }}>
               <Camera style={{ width: '20px', height: '20px' }} />
             </button>
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleFileChange} />
           </div>
-          <p className="mt-4 text-xs text-slate-500 font-medium">Clique no ícone da câmera para enviar sua foto</p>
         </div>
 
         <div ref={idCardRef} style={styles.cardWrapper}>
@@ -230,11 +205,12 @@ export default function StudentID() {
           <div style={styles.badge}><CheckCircle2 style={{ width: '12px', height: '12px', marginRight: '4px' }} /> ATIVO</div>
         </div>
 
-        <Button onClick={downloadPDF} disabled={isGeneratingPDF || isUploading} style={{ width: '100%', height: '48px', backgroundColor: '#003366', color: '#ffffff' }}>
-          {isGeneratingPDF ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
+        <Button onClick={downloadPDF} disabled={isGeneratingPDF} style={{ width: '100%', height: '48px', backgroundColor: '#003366', color: '#ffffff' }}>
+          {isGeneratingPDF ? <Loader2 style={{ animation: 'spin 1s linear infinite' }} /> : <Download style={{ marginRight: '8px' }} />}
           Baixar Carteirinha (PDF)
         </Button>
       </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

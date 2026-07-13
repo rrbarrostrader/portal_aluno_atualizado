@@ -8,7 +8,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { sendPasswordChangeEmail } from "../email";
 import { users } from "../../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -286,8 +286,8 @@ export const authRouter = router({
           
         const buffer = Buffer.from(base64Data, "base64");
         
-        // Define o diretório de upload de forma compatível com Windows/Linux
-        const uploadDir = path.resolve(process.cwd(), "public", "uploads", "profiles");
+        // Define o diretório de upload (pasta public para ser acessível pelo frontend)
+        const uploadDir = path.join(process.cwd(), "public", "uploads", "profiles");
         
         // Garante que a pasta existe
         try {
@@ -306,25 +306,12 @@ export const authRouter = router({
         // URL pública para o frontend
         const publicUrl = `/uploads/profiles/${fileName}`;
 
-        // SOLUÇÃO DEFINITIVA: 
-        // 1. Verificamos se a coluna existe. Se não existir, a query falhará.
-        // 2. Usamos o ID como inteiro se for serial, ou string se for varchar.
-        // O erro anterior indica que a query falhou porque a coluna 'profile_image_url' 
-        // pode não existir fisicamente no banco de dados, embora estivesse no código.
-        
-        try {
-          await db.execute(sql`
-            UPDATE users 
-            SET profile_image_url = ${publicUrl} 
-            WHERE id = ${ctx.user.id}
-          `);
-        } catch (dbError) {
-          console.error("[Upload] Erro ao atualizar banco de dados:", dbError);
-          // Tenta uma abordagem alternativa se a primeira falhar (talvez o nome da coluna seja diferente)
-          throw new Error("A coluna 'profile_image_url' não foi encontrada no banco de dados. Por favor, execute as migrações ou crie a coluna manualmente.");
-        }
+        // Atualiza o usuário no banco
+        await db.update(users)
+          .set({ profileImageUrl: publicUrl })
+          .where(eq(users.id, ctx.user.id));
 
-        console.log(`[Upload] Banco de dados atualizado com sucesso.`);
+        console.log(`[Upload] Banco de dados atualizado com URL: ${publicUrl}`);
 
         return { success: true, imageUrl: publicUrl };
       } catch (error) {

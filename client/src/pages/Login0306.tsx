@@ -59,7 +59,7 @@ export default function Login() {
         </div>
 
         {/* Formulário de Login */}
-        <Card className="bg-slate-800 border-slate-700 shadow-2xl">
+        <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="text-white">Faça seu Login</CardTitle>
             <CardDescription className="text-slate-400">
@@ -76,7 +76,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loginMutation.isPending}
-                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 h-12 rounded-xl"
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
                   required
                 />
               </div>
@@ -89,7 +89,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loginMutation.isPending}
-                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400 h-12 rounded-xl"
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
                   required
                 />
               </div>
@@ -97,23 +97,33 @@ export default function Login() {
               <Button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black h-12 rounded-xl mt-4 transition-all"
+                className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-semibold"
               >
                 {loginMutation.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ENTRANDO...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
                   </>
                 ) : (
-                  "ENTRAR NO PORTAL"
+                  "Entrar"
                 )}
               </Button>
             </form>
+
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <p className="text-sm text-slate-400 text-center">
+                Credenciais padrão para admin:
+                <br />
+                <span className="text-slate-300 font-mono">admin@iabfapgema.com.br</span>
+                <br />
+                <span className="text-slate-300 font-mono">IAB_@2026_START</span>
+              </p>
+            </div>
           </CardContent>
         </Card>
 
         {/* Rodapé */}
-        <div className="mt-8 text-center text-slate-500 text-sm">
+        <div className="mt-8 text-center text-slate-400 text-sm">
           <p>© 2026 IAB FAPEGMA. Todos os direitos reservados.</p>
         </div>
       </div>

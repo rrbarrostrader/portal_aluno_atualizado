@@ -74,7 +74,7 @@ function Router() {
         component={() => <ProtectedRoute component={StudentDashboard} requiredRole="user" />}
       />
       <Route
-        path={"/student/Notas"}
+        path={"/student/boletim"}
         component={() => <ProtectedRoute component={StudentGrades} requiredRole="user" />}
       />
       <Route

@@ -55,7 +55,6 @@ export const users = pgTable("users", {
   birthDate: date("birthdate"),
   address: text("address"),
   phone: varchar("phone", { length: 20 }),
-  profileImageUrl: text("profile_image_url"), // Coluna adicionada para suportar fotos de perfil
 });
 
 /**

@@ -51,19 +51,16 @@ export const gradesRouter = router({
       
       console.log("Executando gravação de nota no banco real:", input);
 
-      // Garantir que o status seja atualizado com base na média (finalGrade)
-      const status = input.finalGrade && input.finalGrade >= 7 ? "approved" : "pending";
-
       const query = sql`
         INSERT INTO grades (
           enrollmentid, subjectid, semester, 
           firstbimester, secondbimester, thirdbimester, fourthbimester,
-          status, updatedat
+          updatedat
         ) 
         VALUES (
           ${input.enrollmentId}, ${input.subjectId}, ${input.semester},
           ${input.firstBimester}, ${input.secondBimester}, ${input.thirdBimester}, ${input.fourthBimester},
-          ${status}, NOW()
+          NOW()
         )
         ON CONFLICT (enrollmentid, subjectid, semester) 
         DO UPDATE SET 
@@ -71,7 +68,6 @@ export const gradesRouter = router({
           secondbimester = EXCLUDED.secondbimester,
           thirdbimester = EXCLUDED.thirdbimester,
           fourthbimester = EXCLUDED.fourthbimester,
-          status = EXCLUDED.status,
           updatedat = NOW()
       `;
 
